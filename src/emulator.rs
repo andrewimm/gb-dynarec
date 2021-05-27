@@ -480,9 +480,9 @@ mod tests {
       0xac, // XOR A, H
       0xc3, 0x20, 0x00, // JMP 0x0020
       0x2e, 0xf0, // LD L, 0xf0
-      0xad, // AND A, L
+      0xad, // XOR A, L
       0xc3, 0x26, 0x00, // JMP 0x0026
-      0xaf, // ADD A, A
+      0xaf, // XOR A, A
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block();
@@ -499,6 +499,47 @@ mod tests {
     assert_eq!(core.registers.get_af(), 0x3900);
     core.run_code_block();
     assert_eq!(core.registers.get_af(), 0x0080);
+  }
+
+  #[test]
+  fn or_a() {
+    let code = vec![
+      0x3e, 0x00, // LD A, 0x00
+      0x06, 0x00, // LD B, 0x00
+      0xb0, // OR A, B
+      0xc3, 0x08, 0x00, // JMP 0x0008
+      0x0e, 0x54, // LD C, 0x54
+      0xb1, // OR A, C
+      0xc3, 0x0e, 0x00, // JMP 0x000e
+      0x16, 0x80, // LD D, 0x80
+      0xb2, // OR A, D
+      0xc3, 0x14, 0x00, // JMP 0x0014
+      0x1e, 0x03, // LD E, 0x03
+      0xb3, // OR A, E
+      0xc3, 0x1a, 0x00, // JMP 0x001a
+      0x26, 0x04, // LD H, 0x04
+      0xb4, // OR A, H
+      0xc3, 0x20, 0x00, // JMP 0x0020
+      0x2e, 0xf0, // LD L, 0xf0
+      0xb5, // OR A, L
+      0xc3, 0x26, 0x00, // JMP 0x0026
+      0xb7, // OR A, A
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0080);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x5400);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xd400);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xd700);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xd700);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xf700);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xf700);
   }
 
   #[test]
