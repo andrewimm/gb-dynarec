@@ -21,8 +21,9 @@ fn main() {
   */
 
   let code = vec![
-    0x3e, 0x0e, // MOV A, 0x0e
-    0x17, // RLA
+    0x06, 0x0f, // LD B, 0x0f
+      0xcb, 0x40, // BIT 0,B
+      0xc3, 0x07, 0x00, // JMP 0x0007
   ];
   let mut core = emulator::Core::with_code_block(code.into_boxed_slice());
   core.run_code_block();

@@ -709,6 +709,56 @@ mod tests {
   }
 
   #[test]
+  fn bit_test() {
+    let code = vec![
+      0x06, 0x0f, // LD B, 0x0f
+      0xcb, 0x40, // BIT 0,B
+      0xc3, 0x07, 0x00, // JMP 0x0007
+      0x0e, 0xf8, // LD C, 0xf8
+      0xcb, 0x49, // BIT 1, C
+      0xc3, 0x0e, 0x00, // JMP 0x000e
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0020);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x00a0);
+  }
+
+  #[test]
+  fn bit_set() {
+    let code = vec![
+      0xcb, 0xc0, // SET 0, B
+      0xc3, 0x05, 0x00, // JMP 0x0005
+      0x0e, 0x44, // LD C, 0x44
+      0xcb, 0xc9, // BIT 1, C
+      0xc3, 0x0c, 0x00, // JMP 0x000c
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0x0100);
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0x0146);
+  }
+
+  #[test]
+  fn bit_clear() {
+    let code = vec![
+      0x06, 0x05, // LD B, 0x05
+      0xcb, 0x80, // RES 0, B
+      0xc3, 0x07, 0x00, // JMP 0x0007
+      0x0e, 0x08, // LD C, 0x08
+      0xcb, 0x89, // RES 1, C
+      0xc3, 0x0e, 0x00, // JMP 0x000e
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0x0400);
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0x0408);
+  }
+
+  #[test]
   fn complement_a() {
     let code = vec![
       0x3e, 0x14, // LD A, 0x14
