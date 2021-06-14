@@ -55,12 +55,12 @@ impl core::fmt::Debug for Registers {
     let sp = self.sp;
     let ip = self.ip;
     formatter.debug_struct("Register")
-      .field("AF", &format_args!("{:#010x}", af))
-      .field("BC", &format_args!("{:#010x}", bc))
-      .field("DE", &format_args!("{:#010x}", de))
-      .field("HL", &format_args!("{:#010x}", hl))
-      .field("SP", &format_args!("{:#010x}", sp))
-      .field("IP", &format_args!("{:#010x}", ip))
+      .field("AF", &format_args!("{:#06x}", af))
+      .field("BC", &format_args!("{:#06x}", bc))
+      .field("DE", &format_args!("{:#06x}", de))
+      .field("HL", &format_args!("{:#06x}", hl))
+      .field("SP", &format_args!("{:#06x}", sp))
+      .field("IP", &format_args!("{:#06x}", ip))
       .finish()
   }
 }

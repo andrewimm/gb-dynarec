@@ -212,9 +212,11 @@ impl Emitter {
   }
 
   pub fn encode_rotate_left_carry(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let mut len = emit_rotate_left(map_register_8(reg), exec);
+    let xreg = map_register_8(reg);
+    let mut len = emit_rotate_left(xreg, exec);
     len += emit_store_flags(0x10, false, &mut exec[len..]);
-    len += emit_force_flags_off(0xe0, &mut exec[len..]);
+    len += emit_zero_flag_test(xreg, &mut exec[len..]);
+    len += emit_force_flags_off(0x60, &mut exec[len..]);
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
@@ -461,6 +463,18 @@ fn emit_force_flags_on(flags: u8, exec: &mut [u8]) -> usize {
   exec[0] = 0x0c; // or al, flags
   exec[1] = flags;
   2
+}
+
+fn emit_zero_flag_test(reg: X86Reg8, exec: &mut [u8]) -> usize {
+  let code = [
+    0x08, register_to_register(reg, reg), // or reg, reg
+    0x41, 0x0f, 0x94, 0xc0, // setz r8b
+    0x41, 0xd0, 0xc8, // ror r8b
+    0x44, 0x08, 0xc0, // or al, r8b
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
 }
 
 fn emit_store_flags(mask: u8, negative: bool, exec: &mut [u8]) -> usize {
@@ -711,6 +725,7 @@ fn map_register_8(gb_reg: Register8) -> X86Reg8 {
   }
 }
 
+#[derive(Copy, Clone)]
 enum X86Reg8 {
   AH,
   AL,
@@ -722,6 +737,7 @@ enum X86Reg8 {
   DL,
 }
 
+#[derive(Copy, Clone)]
 enum X86Reg16 {
   AX,
   BX,

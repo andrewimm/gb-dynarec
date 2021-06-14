@@ -607,6 +607,52 @@ mod tests {
   }
 
   #[test]
+  fn rlc() {
+    let code = vec![
+      0x06, 0x01, // LD B, 0x01
+      0xcb, 0x00, // RLC B
+      0xc3, 0x07, 0x00, // JMP 0x0007
+      0x0e, 0xc3, // LD C, 0xc3
+      0xcb, 0x01, // RLC C
+      0xc3, 0x0e, 0x00, // JMP 0x000e
+      0x16, 0x70, // LD D, 0x70
+      0xcb, 0x02, // RLC D
+      0xc3, 0x15, 0x00, // JMP 0x0015
+      0x1e, 0xff, // LD E, 0xff
+      0xcb, 0x03, // RLC E
+      0xc3, 0x1c, 0x00, // JMP 0x001c
+      0x26, 0x03, // LD H, 0x03
+      0xcb, 0x04, // RLC H
+      0xc3, 0x23, 0x00, // JMP 0x0023
+      0x2e, 0xc0, // LD L, 0xc0
+      0xcb, 0x05, // RLC L
+      0xc3, 0x2a, 0x00, // JMP 0x002a
+      0x3e, 0x00, // LD A, 0x00
+      0xcb, 0x07, // RLC A
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0x0200);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0010);
+    assert_eq!(core.registers.get_bc(), 0x0287);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0000);
+    assert_eq!(core.registers.get_de(), 0xe000);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0010);
+    assert_eq!(core.registers.get_de(), 0xe0ff);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0000);
+    assert_eq!(core.registers.get_hl(), 0x0600);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0010);
+    assert_eq!(core.registers.get_hl(), 0x0681);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0080);
+  }
+
+  #[test]
   fn rra() {
     let code = vec![
       0x3e, 0x0e, // MOV A, 0x0e
