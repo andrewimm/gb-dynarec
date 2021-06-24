@@ -3,6 +3,7 @@ pub mod cpu;
 pub mod decoder;
 pub mod emitter;
 pub mod emulator;
+pub mod mem;
 
 fn main() {
   // Initialize UI/Audio/Input
@@ -21,11 +22,11 @@ fn main() {
   */
 
   let code = vec![
-    0x06, 0x0f, // LD B, 0x0f
-      0xcb, 0x40, // BIT 0,B
-      0xc3, 0x07, 0x00, // JMP 0x0007
+    0x26, 0xc0, // LD H, 0xc0
+    0x2e, 0x03, // LD L, 0x03
+    0x36, 0x58, // LD (HL), 0x58
   ];
   let mut core = emulator::Core::with_code_block(code.into_boxed_slice());
   core.run_code_block();
-  println!("AF: {:X}", core.registers.get_af());
+  println!("RAM 0xc003 = {:X}", core.memory.work_ram[0x03]);
 }

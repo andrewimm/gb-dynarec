@@ -3,6 +3,7 @@ pub mod linux;
 use crate::cpu::Registers;
 use crate::decoder::decode;
 use crate::emitter::Emitter;
+use crate::mem::MemoryAreas;
 use linux::ExecutableMemory;
 use std::collections::BTreeMap;
 
@@ -39,14 +40,13 @@ impl CodeCache {
     }
   }
 
-  pub fn translate_code_block(&mut self, code: &Box<[u8]>, ip: usize) -> usize {
+  pub fn translate_code_block(&mut self, code: &Box<[u8]>, ip: usize, mem: *const MemoryAreas) -> usize {
     let mut write_cursor = self.write_cursor;
     let starting_offset = write_cursor;
-    println!("WRITING AT {:X}", starting_offset);
 
     self.exec_memory.make_writable();
     let translated = self.exec_memory.get_memory_area_mut();
-    let emitter = Emitter::new();
+    let emitter = Emitter::new(mem);
     write_cursor += emitter.encode_prelude(&mut translated[write_cursor..]);
 
     let mut block_ended = false;
@@ -63,7 +63,7 @@ impl CodeCache {
 
     self.exec_memory.make_executable();
     self.write_cursor = write_cursor;
-    println!("ENDED AT {:X}", write_cursor);
+
     starting_offset
   }
 

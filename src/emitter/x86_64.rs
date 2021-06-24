@@ -1,13 +1,14 @@
 use crate::decoder::ops::{Op, IndirectLocation, JumpCondition, Register8, Register16, Source8};
+use crate::mem::MemoryAreas;
 
 pub struct Emitter {
-  
+  mem: *const MemoryAreas,
 }
 
 impl Emitter {
-  pub fn new() -> Self {
+  pub fn new(mem: *const MemoryAreas) -> Self {
     Self {
-
+      mem
     }
   }
 
@@ -59,6 +60,7 @@ impl Emitter {
       Op::Load8(dest, src) => self.encode_load_8_register(dest, src, ip_increment, exec),
       Op::Load16(reg, value) => self.encode_load_16(reg, value, ip_increment, exec),
       Op::LoadToIndirect(location, value) => self.encode_load_to_indirect(location, value, ip_increment, exec),
+      Op::LoadFromIndirect(reg, location) => self.encode_load_from_indirect(reg, location, ip_increment, exec),
       Op::Load8Immediate(reg, value) => self.encode_load_8(reg, value, ip_increment, exec),
       Op::Increment8(reg) => self.encode_increment_8(reg, ip_increment, exec),
       Op::Decrement8(reg) => self.encode_decrement_8(reg, ip_increment, exec),
@@ -286,8 +288,30 @@ impl Emitter {
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
-  pub fn encode_load_to_indirect(&self, _location: IndirectLocation, _value: Source8, _ip_increment: usize, _exec: &mut [u8]) -> usize {
-    panic!("unimplemented");
+  pub fn encode_load_to_indirect(&self, location: IndirectLocation, value: Source8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let indirect_address = map_indirect_location_to_register(location);
+    let mut len = match value {
+      Source8::Literal(literal) => emit_memory_write_literal(exec, self.mem as usize, indirect_address, literal),
+      _ => emit_memory_write(exec, self.mem as usize, indirect_address, map_source_to_register(value)),
+    };
+    len += match location {
+      IndirectLocation::HLIncrement => emit_increment_16(X86Reg16::CX, &mut exec[len..]),
+      IndirectLocation::HLDecrement => emit_decrement_16(X86Reg16::CX, &mut exec[len..]),
+      _ => 0,
+    };
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_load_from_indirect(&self, reg: Register8, location: IndirectLocation, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let indirect_address = map_indirect_location_to_register(location);
+    let dest_register = map_register_8(reg);
+    let mut len = emit_memory_read(exec, self.mem as usize, indirect_address, dest_register);
+    len += match location {
+      IndirectLocation::HLIncrement => emit_increment_16(X86Reg16::CX, &mut exec[len..]),
+      IndirectLocation::HLDecrement => emit_decrement_16(X86Reg16::CX, &mut exec[len..]),
+      _ => 0,
+    };
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
   pub fn encode_jump(&self, condition: JumpCondition, address: u16, exec: &mut [u8]) -> usize {
@@ -712,12 +736,18 @@ fn emit_jump_zero(relative: i8, exec: &mut [u8]) -> usize {
 }
 
 fn emit_ip_increment(amount: usize, exec: &mut [u8]) -> usize {
-  exec[0] = 0x66;
+  /*exec[0] = 0x66;
   exec[1] = 0x41;
   exec[2] = 0x83;
   exec[3] = 0xc5;
   exec[4] = amount as u8;
   5
+  */
+  exec[0] = 0x49; // add r13, amount
+  exec[1] = 0x83;
+  exec[2] = 0xc5;
+  exec[3] = amount as u8;
+  4
 }
 
 fn emit_register_or(reg: X86Reg8, mask: u8, exec: &mut [u8]) -> usize {
@@ -750,6 +780,168 @@ fn emit_register_and(reg: X86Reg8, mask: u8, exec: &mut [u8]) -> usize {
   };
   exec[2] = mask;
   3
+}
+
+fn emit_memory_read(exec: &mut [u8], memory_base: usize, indirect_address: X86Reg16, dest_register: X86Reg8) -> usize {
+  let fn_pointer = address_as_bytes(crate::mem::memory_read_byte as u64);
+  let address_source = match indirect_address {
+    X86Reg16::BX => 0xde,
+    X86Reg16::CX => 0xce,
+    X86Reg16::DX => 0xd6,
+    _ => panic!("cannot read from address at register"),
+  };
+  let stack_offset = match dest_register {
+    X86Reg8::BL => 0,
+    X86Reg8::BH => 1,
+    X86Reg8::DL => 8,
+    X86Reg8::DH => 9,
+    X86Reg8::CL => 16,
+    X86Reg8::CH => 17,
+    X86Reg8::AL => 24,
+    X86Reg8::AH => 25,
+  };
+  let memory_pointer = address_as_bytes(memory_base as u64);
+  let code = [
+    0x50, // push rax
+    0x51, // push rcx
+    0x52, // push rdx
+    0x53, // push rbx
+    0x48, 0x89, address_source, // mov rsi, indirect_address
+    0x48, 0xbf, // movabs rdi, memory_pointer
+      memory_pointer[0],
+      memory_pointer[1],
+      memory_pointer[2],
+      memory_pointer[3],
+      memory_pointer[4],
+      memory_pointer[5],
+      memory_pointer[6],
+      memory_pointer[7],
+
+    0x48, 0xb8, // movabs rax, fn_pointer
+      fn_pointer[0],
+      fn_pointer[1],
+      fn_pointer[2],
+      fn_pointer[3],
+      fn_pointer[4],
+      fn_pointer[5],
+      fn_pointer[6],
+      fn_pointer[7],
+    0xff, 0xd0, // call rax
+    // $rax will hold the return result
+    // move the value from $al to the appropriate register on the stack before
+    // popping all of them
+    0x88, 0x44, 0x24, stack_offset, // mov [rsp + stack_offset], al
+    0x5b, // pop rbx
+    0x5a, // pop rdx
+    0x59, // pop rcx
+    0x58, // pop rax
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
+}
+
+fn emit_memory_write(exec: &mut [u8], memory_base: usize, indirect_address: X86Reg16, source: X86Reg8) -> usize {
+  let fn_pointer = address_as_bytes(crate::mem::memory_write_byte as u64);
+  let address_dest = match indirect_address {
+    X86Reg16::BX => 0xde,
+    X86Reg16::CX => 0xce,
+    X86Reg16::DX => 0xd6,
+    _ => panic!("cannot read from address at register"),
+  };
+  let memory_pointer = address_as_bytes(memory_base as u64);
+  let code = [
+    0x50, // push rax
+    0x51, // push rcx
+    0x52, // push rdx
+    0x48, 0x89, address_dest, // mov rsi, indirect_address
+    0x48, 0xbf, // movabs rdi, memory_pointer
+      memory_pointer[0],
+      memory_pointer[1],
+      memory_pointer[2],
+      memory_pointer[3],
+      memory_pointer[4],
+      memory_pointer[5],
+      memory_pointer[6],
+      memory_pointer[7],
+    0x88, register_to_register(source, X86Reg8::DL), // mov dl, source
+    0x48, 0x81, 0xe2, 0xff, 0x00, 0x00, 0x00, // and rdx, 0xff
+
+    0x48, 0xb8, // movabs rax, fn_pointer
+      fn_pointer[0],
+      fn_pointer[1],
+      fn_pointer[2],
+      fn_pointer[3],
+      fn_pointer[4],
+      fn_pointer[5],
+      fn_pointer[6],
+      fn_pointer[7],
+    0xff, 0xd0, // call rax
+    0x5a, // pop rdx
+    0x59, // pop rcx
+    0x58, // pop rax
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
+}
+
+fn emit_memory_write_literal(exec: &mut [u8], memory_base: usize, indirect_address: X86Reg16, value: u8) -> usize {
+  let fn_pointer = address_as_bytes(crate::mem::memory_write_byte as u64);
+  let address_dest = match indirect_address {
+    X86Reg16::BX => 0xde,
+    X86Reg16::CX => 0xce,
+    X86Reg16::DX => 0xd6,
+    _ => panic!("cannot read from address at register"),
+  };
+  let memory_pointer = address_as_bytes(memory_base as u64);
+  let code = [
+    0x50, // push rax
+    0x51, // push rcx
+    0x52, // push rdx
+    0x48, 0x89, address_dest, // mov rsi, indirect_address
+    0x48, 0xbf, // movabs rdi, memory_pointer
+      memory_pointer[0],
+      memory_pointer[1],
+      memory_pointer[2],
+      memory_pointer[3],
+      memory_pointer[4],
+      memory_pointer[5],
+      memory_pointer[6],
+      memory_pointer[7],
+    0xb2, value, // mov dl, value
+    0x48, 0x81, 0xe2, 0xff, 0x00, 0x00, 0x00, // and rdx, 0xff
+
+    0x48, 0xb8, // movabs rax, fn_pointer
+      fn_pointer[0],
+      fn_pointer[1],
+      fn_pointer[2],
+      fn_pointer[3],
+      fn_pointer[4],
+      fn_pointer[5],
+      fn_pointer[6],
+      fn_pointer[7],
+    0xff, 0xd0, // call rax
+    0x5a, // pop rdx
+    0x59, // pop rcx
+    0x58, // pop rax
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
+}
+
+fn address_as_bytes(addr: u64) -> [u8; 8] {
+  [
+    (addr & 0xff) as u8,
+    ((addr >> 8) & 0xff) as u8,
+    ((addr >> 16) & 0xff) as u8,
+    ((addr >> 24) & 0xff) as u8,
+    ((addr >> 32) & 0xff) as u8,
+    ((addr >> 40) & 0xff) as u8,
+    ((addr >> 48) & 0xff) as u8,
+    ((addr >> 56) & 0xff) as u8,
+  ]
 }
 
 fn register_to_register(src: X86Reg8, dest: X86Reg8) -> u8 {
@@ -796,6 +988,29 @@ fn map_register_8(gb_reg: Register8) -> X86Reg8 {
     Register8::E => X86Reg8::DL,
     Register8::H => X86Reg8::CH,
     Register8::L => X86Reg8::CL,
+  }
+}
+
+fn map_indirect_location_to_register(location: IndirectLocation) -> X86Reg16 {
+  match location {
+    IndirectLocation::BC => X86Reg16::BX,
+    IndirectLocation::DE => X86Reg16::DX,
+    IndirectLocation::HL
+      | IndirectLocation::HLDecrement
+      | IndirectLocation::HLIncrement => X86Reg16::CX,
+  }
+}
+
+fn map_source_to_register(source: Source8) -> X86Reg8 {
+  match source {
+    Source8::A => X86Reg8::AH,
+    Source8::B => X86Reg8::BH,
+    Source8::C => X86Reg8::BL,
+    Source8::D => X86Reg8::DH,
+    Source8::E => X86Reg8::DL,
+    Source8::H => X86Reg8::CH,
+    Source8::L => X86Reg8::CL,
+    _ => unreachable!("Literal is not passed to this mapping"),
   }
 }
 

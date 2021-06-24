@@ -68,6 +68,7 @@ impl Op {
   }
 }
 
+#[derive(Copy, Clone)]
 pub enum IndirectLocation {
   BC,
   DE,
@@ -76,6 +77,7 @@ pub enum IndirectLocation {
   HLDecrement,
 }
 
+#[derive(Copy, Clone)]
 pub enum Source8 {
   A,
   B,
@@ -87,6 +89,7 @@ pub enum Source8 {
   Literal(u8),
 }
 
+#[derive(Copy, Clone)]
 pub enum Register8 {
   A,
   F,
@@ -98,6 +101,7 @@ pub enum Register8 {
   L,
 }
 
+#[derive(Copy, Clone)]
 pub enum Register16 {
   AF,
   BC,

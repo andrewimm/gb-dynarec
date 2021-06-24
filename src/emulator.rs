@@ -1,12 +1,12 @@
 use crate::cache::CodeCache;
 use crate::cpu::Registers;
+use crate::mem::MemoryAreas;
 
 pub struct Core {
   pub cache: CodeCache,
   pub registers: Registers,
 
-  // hack until we build the bus / MMC handling
-  pub code: Box<[u8]>,
+  pub memory: MemoryAreas,
 }
 
 impl Core {
@@ -14,7 +14,7 @@ impl Core {
     Self {
       cache: CodeCache::new(),
       registers: Registers::new(),
-      code,
+      memory: MemoryAreas::with_rom(code),
     }
   }
 
@@ -26,7 +26,7 @@ impl Core {
       if let Some(addr) = found_address {
         addr
       } else {
-        self.cache.translate_code_block(&self.code, ip)
+        self.cache.translate_code_block(&self.memory.rom, ip, self.memory.as_ptr())
       }
     };
     self.cache.call(address, &mut self.registers);
@@ -786,6 +786,69 @@ mod tests {
     assert_eq!(core.registers.get_af(), 0x0000);
     core.run_code_block();
     assert_eq!(core.registers.get_af(), 0x0010);
+  }
+
+  #[test]
+  fn load_to_indirect() {
+    let code = vec![
+      0x3e, 0x45, // LD A, 0x45
+      0x06, 0xc0, // LD B, 0xc0
+      0x0e, 0x05, // LD C, 0x05,
+      0x02, // LD (BC), A
+      0xc3, 0x0a, 0x00, // JP 0x000a
+      0x16, 0xc1, // LD D, 0xc1,
+      0x1e, 0x01, // LD E, 0x01,
+      0x12, // LD (DE), A
+      0xc3, 0x12, 0x00, // JP 0x0012
+      0x26, 0xc2, // LD H, 0xc2
+      0x2e, 0x10, // LD L, 0x10
+      0x22, // LD (HL+), A
+      0xc3, 0x1a, 0x00, // JP 0x001a
+      0x32, // LD (HL-), A
+      0xc3, 0x1e, 0x00, // JP 0x001e
+      0x36, 0x2a, // LD (HL), 0x2a
+      0xc3, 0x23, 0x00, // JP 0x0023
+      0x70, // LD (HL), B
+      0xc3, 0x27, 0x00, // JP 0x0027
+      0x71, // LD (HL), C
+      0xc3, 0x2b, 0x00, // JP 0x002b
+      0x72, // LD (HL), D
+      0xc3, 0x2f, 0x00, // JP 0x002f
+      0x73, // LD (HL), E
+      0xc3, 0x33, 0x00, // JP 0x0033
+      0x74, // LD (HL), H
+      0xc3, 0x37, 0x00, // JP 0x0037
+      0x75, // LD (HL), L
+      0xc3, 0x3b, 0x00, // JP 0x003b
+      0x77, // LD (HL), A
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x05], 0x45);
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x101], 0x45);
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x210], 0x45);
+    assert_eq!(core.registers.get_hl(), 0xc211);
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x211], 0x45);
+    assert_eq!(core.registers.get_hl(), 0xc210);
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x210], 0x2a);
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x210], 0xc0);
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x210], 0x05);
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x210], 0xc1);
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x210], 0x01);
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x210], 0xc2);
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x210], 0x10);
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x210], 0x45);
   }
 
   #[test]
