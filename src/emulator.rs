@@ -852,6 +852,67 @@ mod tests {
   }
 
   #[test]
+  fn load_from_indirect() {
+    let code = vec![
+      0x06, 0xc0, // LD B, 0xc0
+      0x0e, 0x03, // LD C, 0x03,
+      0x0a, // LD A, (BC)
+      0xc3, 0x08, 0x00, // JP 0x0008
+      0x16, 0x00, // LD D, 0x00
+      0x1e, 0x04, // LD E, 0x04
+      0x1a, // LD A, (DE)
+      0xc3, 0x10, 0x00, // JP 0x0010
+      0x26, 0x00, // LD H, 0x00
+      0x2e, 0x12, // LD L, 0x12
+      0x2a, // LD A, (HL+)
+      0xc3, 0x18, 0x00, // JP 0x0018
+      0x3a, // LD A, (HL-)
+      0xc3, 0x1c, 0x00, // JP 0x001c
+      0x46, // LD B, (HL)
+      0xc3, 0x20, 0x00, // JP 0x0020
+      0x4e, // LD C, (HL)
+      0xc3, 0x24, 0x00, // JP 0x0024
+      0x56, // LD D, (HL)
+      0xc3, 0x28, 0x00, // JP 0x0028
+      0x5e, // LD E, (HL)
+      0xc3, 0x2c, 0x00, // JP 0x002c
+      0x7e, // LD A, (HL)
+      0xc3, 0x30, 0x00, // JP 0x0030
+      0x6e, // LD L, (HL)
+      0xc3, 0x34, 0x00, // JP 0x0030
+      0x66, // LD H, (HL)
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    for i in 0..10 {
+      core.memory.work_ram[i] = i as u8;
+    }
+    core.run_code_block();
+    assert_eq!(core.registers.get_af() & 0xff00, 0x0300);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af() & 0xff00, 0x0a00);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af() & 0xff00, 0x2e00);
+    assert_eq!(core.registers.get_hl(), 0x0013);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af() & 0xff00, 0x1200);
+    assert_eq!(core.registers.get_hl(), 0x0012);
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0x2e03);
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0x2e2e);
+    core.run_code_block();
+    assert_eq!(core.registers.get_de(), 0x2e04);
+    core.run_code_block();
+    assert_eq!(core.registers.get_de(), 0x2e2e);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af() & 0xff00, 0x2e00);
+    core.run_code_block();
+    assert_eq!(core.registers.get_hl(), 0x002e);
+    core.run_code_block();
+    assert_eq!(core.registers.get_hl(), 0x302e);
+  }
+
+  #[test]
   fn write_stack_pointer_to_memory() {
     let code = vec![
       0x31, 0x20, 0x44, // LD SP, 0x4420
