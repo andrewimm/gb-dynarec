@@ -88,3 +88,10 @@ pub extern "sysv64" fn memory_write_byte(areas: *mut MemoryAreas, addr: u16, val
   }
   // Mirror and I/O
 }
+
+pub extern "sysv64" fn memory_write_word(areas: *mut MemoryAreas, addr: u16, value: u16) {
+  let low = (value & 0xff) as u8;
+  let high = (value >> 8) as u8;
+  memory_write_byte(areas, addr, low);
+  memory_write_byte(areas, addr + 1, high);
+}

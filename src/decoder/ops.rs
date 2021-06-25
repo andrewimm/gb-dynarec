@@ -44,6 +44,8 @@ pub enum Op {
   BitClear(Register8, u8),
   BitSet(Register8, u8),
   LoadStackPointerToMemory(u16),
+  LoadAToMemory(u16),
+  LoadAFromMemory(u16),
   DAA,
   ComplementA,
   ComplementCarryFlag,

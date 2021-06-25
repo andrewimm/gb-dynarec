@@ -89,6 +89,9 @@ impl Emitter {
       Op::BitSet(reg, mask) => self.encode_bit_set(reg, mask, ip_increment, exec),
       Op::BitClear(reg, mask) => self.encode_bit_clear(reg, mask, ip_increment, exec),
       Op::BitTest(reg, mask) => self.encode_bit_test(reg, mask, ip_increment, exec),
+      Op::LoadStackPointerToMemory(addr) => self.encode_load_stack_to_memory(addr, ip_increment, exec),
+      Op::LoadAToMemory(addr) => self.encode_load_a_to_memory(addr, ip_increment, exec),
+      Op::LoadAFromMemory(addr) => self.encode_load_a_from_memory(addr, ip_increment, exec),
 
       Op::Jump(cond, address) => self.encode_jump(cond, address, exec),
 
@@ -311,6 +314,21 @@ impl Emitter {
       IndirectLocation::HLDecrement => emit_decrement_16(X86Reg16::CX, &mut exec[len..]),
       _ => 0,
     };
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_load_stack_to_memory(&self, addr: u16, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let len = emit_write_stack_to_memory(exec, self.mem as usize, addr);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_load_a_to_memory(&self, addr: u16, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let len = emit_write_a_to_memory(exec, self.mem as usize, addr);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_load_a_from_memory(&self, addr: u16, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let len = emit_read_a_from_memory(exec, self.mem as usize, addr);
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
@@ -922,6 +940,120 @@ fn emit_memory_write_literal(exec: &mut [u8], memory_base: usize, indirect_addre
       fn_pointer[6],
       fn_pointer[7],
     0xff, 0xd0, // call rax
+    0x5a, // pop rdx
+    0x59, // pop rcx
+    0x58, // pop rax
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
+}
+
+fn emit_write_stack_to_memory(exec: &mut [u8], memory_base: usize, address: u16) -> usize {
+  let fn_pointer = address_as_bytes(crate::mem::memory_write_word as u64);
+  let memory_pointer = address_as_bytes(memory_base as u64);
+  let code = [
+    0x50, // push rax
+    0x51, // push rcx
+    0x52, // push rdx
+    0x66, 0xbe, (address & 0xff) as u8, (address >> 8) as u8, // mov si, address
+    0x48, 0xbf, // movabs rdi, memory_pointer
+      memory_pointer[0],
+      memory_pointer[1],
+      memory_pointer[2],
+      memory_pointer[3],
+      memory_pointer[4],
+      memory_pointer[5],
+      memory_pointer[6],
+      memory_pointer[7],
+    0x4c, 0x89, 0xe2, // mov rdx, r12
+
+    0x48, 0xb8, // movabs rax, fn_pointer
+      fn_pointer[0],
+      fn_pointer[1],
+      fn_pointer[2],
+      fn_pointer[3],
+      fn_pointer[4],
+      fn_pointer[5],
+      fn_pointer[6],
+      fn_pointer[7],
+    0xff, 0xd0, // call rax
+    0x5a, // pop rdx
+    0x59, // pop rcx
+    0x58, // pop rax
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
+}
+
+fn emit_write_a_to_memory(exec: &mut [u8], memory_base: usize, address: u16) -> usize {
+  let fn_pointer = address_as_bytes(crate::mem::memory_write_byte as u64);
+  let memory_pointer = address_as_bytes(memory_base as u64);
+  let code = [
+    0x50, // push rax
+    0x51, // push rcx
+    0x52, // push rdx
+    0x66, 0xbe, (address & 0xff) as u8, (address >> 8) as u8, // mov si, address
+    0x48, 0xbf, // movabs rdi, memory_pointer
+      memory_pointer[0],
+      memory_pointer[1],
+      memory_pointer[2],
+      memory_pointer[3],
+      memory_pointer[4],
+      memory_pointer[5],
+      memory_pointer[6],
+      memory_pointer[7],
+    0x88, 0xe2, // mov dl, ah
+
+    0x48, 0xb8, // movabs rax, fn_pointer
+      fn_pointer[0],
+      fn_pointer[1],
+      fn_pointer[2],
+      fn_pointer[3],
+      fn_pointer[4],
+      fn_pointer[5],
+      fn_pointer[6],
+      fn_pointer[7],
+    0xff, 0xd0, // call rax
+    0x5a, // pop rdx
+    0x59, // pop rcx
+    0x58, // pop rax
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
+}
+
+fn emit_read_a_from_memory(exec: &mut [u8], memory_base: usize, address: u16) -> usize {
+  let fn_pointer = address_as_bytes(crate::mem::memory_read_byte as u64);
+  let memory_pointer = address_as_bytes(memory_base as u64);
+  let code = [
+    0x50, // push rax
+    0x51, // push rcx
+    0x52, // push rdx
+    0x66, 0xbe, (address & 0xff) as u8, (address >> 8) as u8, // mov si, address
+    0x48, 0xbf, // movabs rdi, memory_pointer
+      memory_pointer[0],
+      memory_pointer[1],
+      memory_pointer[2],
+      memory_pointer[3],
+      memory_pointer[4],
+      memory_pointer[5],
+      memory_pointer[6],
+      memory_pointer[7],
+
+    0x48, 0xb8, // movabs rax, fn_pointer
+      fn_pointer[0],
+      fn_pointer[1],
+      fn_pointer[2],
+      fn_pointer[3],
+      fn_pointer[4],
+      fn_pointer[5],
+      fn_pointer[6],
+      fn_pointer[7],
+    0xff, 0xd0, // call rax
+    0x88, 0x44, 0x24, 0x11, // mov [rsp + 17], al
     0x5a, // pop rdx
     0x59, // pop rcx
     0x58, // pop rax

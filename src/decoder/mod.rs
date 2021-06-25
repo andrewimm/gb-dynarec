@@ -314,6 +314,32 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       (op, 3, 24)
     },
 
+    0xe0 => {
+      let addr_low = instructions[1] as u16;
+      let addr = 0xff00 | addr_low;
+      let op = Op::LoadAToMemory(addr);
+      (op, 2, 12)
+    },
+
+    0xea => {
+      let addr = read_u16(&instructions[1..]);
+      let op = Op::LoadAToMemory(addr);
+      (op, 3, 16)
+    },
+
+    0xf0 => {
+      let addr_low = instructions[1] as u16;
+      let addr = 0xff00 | addr_low;
+      let op = Op::LoadAFromMemory(addr);
+      (op, 2, 12)
+    },
+
+    0xfa => {
+      let addr = read_u16(&instructions[1..]);
+      let op = Op::LoadAFromMemory(addr);
+      (op, 3, 16)
+    },
+
     _ => (Op::Invalid(instructions[0]), 1, 4),
   }
 }

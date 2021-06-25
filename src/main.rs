@@ -22,11 +22,11 @@ fn main() {
   */
 
   let code = vec![
-    0x26, 0xc0, // LD H, 0xc0
-    0x2e, 0x03, // LD L, 0x03
-    0x36, 0x58, // LD (HL), 0x58
+    0x31, 0x20, 0x44, // LD SP, 0x4420
+    0x08, 0x40, 0xc0, // LD (0xc040), SP
   ];
   let mut core = emulator::Core::with_code_block(code.into_boxed_slice());
   core.run_code_block();
-  println!("RAM 0xc003 = {:X}", core.memory.work_ram[0x03]);
+  println!("RAM 0xc040 = {:X}", core.memory.work_ram[0x40]);
+  println!("RAM 0xc041 = {:X}", core.memory.work_ram[0x41]);
 }

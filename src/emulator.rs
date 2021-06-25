@@ -852,6 +852,33 @@ mod tests {
   }
 
   #[test]
+  fn write_stack_pointer_to_memory() {
+    let code = vec![
+      0x31, 0x20, 0x44, // LD SP, 0x4420
+      0x08, 0x40, 0xc0, // LD (0xc040), SP
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x40], 0x20);
+    assert_eq!(core.memory.work_ram[0x41], 0x44);
+  }
+
+  #[test]
+  fn store_and_retrieve_a_from_memory() {
+    let code = vec![
+      0x3e, 0x50, // LD A, 0x50
+      0xea, 0x15, 0xc0, // LD (0xc015), A
+      0xc3, 0x08, 0x00, // JP 0x0008
+      0xfa, 0x02, 0x00, // LD A, (0x0002)
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x15], 0x50);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af() & 0xff00, 0xea00);
+  }
+
+  #[test]
   fn absolute_jump() {
     let code = vec![
       0x3e, 0x0a, // MOV A, 0x0a
