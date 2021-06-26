@@ -278,6 +278,29 @@ mod tests {
   }
 
   #[test]
+  fn increment_hl_indirect() {
+    let code = vec![
+      0x3e, 0x4f, // LD A, 0x4f
+      0xea, 0x10, 0xc0, // LD (0xc010), A
+      0x26, 0xc0, // LD H, 0xc0
+      0x2e, 0x10, // LD L, 0x10
+      0x34, // INC (HL)
+      0xc3, 0x0d, 0x00, // JP 0x000d
+      0x3e, 0xff, // LD A, 0xff
+      0xea, 0x10, 0xc0, // LD (0xc010), A
+      0x34, // INC (HL)
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.registers.af = 0x0040;
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x10], 0x50);
+    assert_eq!(core.registers.get_af(), 0x4f20);
+    core.run_code_block();
+    assert_eq!(core.memory.work_ram[0x10], 0);
+    assert_eq!(core.registers.get_af(), 0xffa0);
+  }
+
+  #[test]
   fn add_hl() {
     {
       let code = vec![
@@ -378,6 +401,23 @@ mod tests {
   }
 
   #[test]
+  fn add_indirect() {
+    let code = vec![
+      0x3e, 0x0f, // LD A, 0x0f
+      0x1e, 0xfc, // LD E, 0xfc
+      0xea, 0x40, 0xc1, // LD (0xc140), A
+      0x26, 0xc1, // LD H, 0xc1
+      0x2e, 0x40, // LD L, 0x40
+      0x3e, 0x01, // LD A, 0x01
+      0x86, // ADD A, (HL)
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x1020);
+    assert_eq!(core.registers.get_de(), 0x00fc);
+  }
+
+  #[test]
   fn adc_a() {
     let code = vec![
       0x3e, 0x60, // LD A, 0x60
@@ -417,6 +457,24 @@ mod tests {
     assert_eq!(core.registers.get_af(), 0x3c00);
     core.run_code_block();
     assert_eq!(core.registers.get_af(), 0x7820);
+  }
+
+  #[test]
+  fn adc_indirect() {
+    let code = vec![
+      0x3e, 0x0d, // LD A, 0x0d
+      0x1e, 0xfc, // LD E, 0xfc
+      0xea, 0x00, 0xc2, // LD (0xc200), A
+      0x26, 0xc2, // LD H, 0xc2
+      0x2e, 0x00, // LD L, 0x00
+      0x3e, 0x02, // LD A, 0x02
+      0x8e, // ADC A, (HL)
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.registers.af = 0x0010;
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x1020);
+    assert_eq!(core.registers.get_de(), 0x00fc);
   }
 
   #[test]
@@ -461,6 +519,23 @@ mod tests {
   }
 
   #[test]
+  fn and_indirect() {
+    let code = vec![
+      0x3e, 0xc3, // LD A, 0xc3
+      0x1e, 0xfc, // LD E, 0xfc
+      0xea, 0x08, 0xc0, // LD (0xc008), A
+      0x26, 0xc0, // LD H, 0xc0
+      0x2e, 0x08, // LD L, 0x08
+      0x3e, 0x88, // LD A, 0x88
+      0xa6, // AND A, (HL)
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x8020);
+    assert_eq!(core.registers.get_de(), 0x00fc);
+  }
+
+  #[test]
   fn xor_a() {
     let code = vec![
       0x3e, 0x0f, // LD A, 0x0f
@@ -502,6 +577,23 @@ mod tests {
   }
 
   #[test]
+  fn xor_indirect() {
+    let code = vec![
+      0x3e, 0xc3, // LD A, 0xc3
+      0x1e, 0xfc, // LD E, 0xfc
+      0xea, 0x20, 0xc0, // LD (0xc020), A
+      0x26, 0xc0, // LD H, 0xc0
+      0x2e, 0x20, // LD L, 0x20
+      0x3e, 0x88, // LD A, 0x88
+      0xae, // XOR A, (HL)
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x4b00);
+    assert_eq!(core.registers.get_de(), 0x00fc);
+  }
+
+  #[test]
   fn or_a() {
     let code = vec![
       0x3e, 0x00, // LD A, 0x00
@@ -540,6 +632,23 @@ mod tests {
     assert_eq!(core.registers.get_af(), 0xf700);
     core.run_code_block();
     assert_eq!(core.registers.get_af(), 0xf700);
+  }
+
+  #[test]
+  fn or_indirect() {
+    let code = vec![
+      0x3e, 0xc3, // LD A, 0xc3
+      0x1e, 0xfc, // LD E, 0xfc
+      0xea, 0x20, 0xc0, // LD (0xc020), A
+      0x26, 0xc0, // LD H, 0xc0
+      0x2e, 0x20, // LD L, 0x20
+      0x3e, 0x88, // LD A, 0x88
+      0xb6, // OR A, (HL)
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xcb00);
+    assert_eq!(core.registers.get_de(), 0x00fc);
   }
 
   #[test]

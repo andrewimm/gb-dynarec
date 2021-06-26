@@ -66,15 +66,22 @@ impl Emitter {
       Op::Decrement8(reg) => self.encode_decrement_8(reg, ip_increment, exec),
       Op::Increment16(reg) => self.encode_increment_16(reg, ip_increment, exec),
       Op::Decrement16(reg) => self.encode_decrement_16(reg, ip_increment, exec),
+      Op::IncrementHLIndirect => self.encode_increment_hl_indirect(ip_increment, exec),
+      Op::DecrementHLIndirect => self.encode_decrement_hl_indirect(ip_increment, exec),
       Op::Add8(dest, src) => self.encode_add_register_8(dest, src, ip_increment, exec),
       Op::AddWithCarry8(dest, src) => self.encode_add_register_8_with_carry(dest, src, ip_increment, exec),
       Op::AddHL(src) => self.encode_add_hl(src, ip_increment, exec),
       Op::AddAbsolute8(value) => self.encode_add_absolute_8(value, ip_increment, exec),
+      Op::AddIndirect => self.encode_add_indirect(ip_increment, exec),
+      Op::AddIndirectWithCarry => self.encode_add_indirect_with_carry(ip_increment, exec),
       Op::Sub8(dest, src) => self.encode_sub_register_8(dest, src, ip_increment, exec),
       Op::SubWithCarry8(dest, src) => self.encode_sub_register_8_with_carry(dest, src, ip_increment, exec),
       Op::And8(dest, src) => self.encode_and_register_8(dest, src, ip_increment, exec),
+      Op::AndIndirect => self.encode_and_indirect(ip_increment, exec),
       Op::Xor8(dest, src) => self.encode_xor_register_8(dest, src, ip_increment, exec),
+      Op::XorIndirect => self.encode_xor_indirect(ip_increment, exec),
       Op::Or8(dest, src) => self.encode_or_register_8(dest, src, ip_increment, exec),
+      Op::OrIndirect => self.encode_or_indirect(ip_increment, exec),
       Op::RotateLeftA => self.encode_rotate_left_a(ip_increment, exec),
       Op::RotateLeftCarryA => self.encode_rotate_left_carry_a(ip_increment, exec),
       Op::RotateLeft(reg) => self.encode_rotate_left(reg, ip_increment, exec),
@@ -144,6 +151,22 @@ impl Emitter {
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
+  pub fn encode_increment_hl_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_hl_indirect_partial_read(self.mem as usize, exec);
+    len += emit_increment_8(X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0xe0, false, &mut exec[len..]);
+    len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_decrement_hl_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_hl_indirect_partial_read(self.mem as usize, exec);
+    len += emit_decrement_8(X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0xe0, true, &mut exec[len..]);
+    len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
   pub fn encode_add_register_8(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_add_register_8(map_register_8(dest), map_register_8(src), exec);
     len += emit_store_flags(0xf0, false, &mut exec[len..]);
@@ -154,6 +177,25 @@ impl Emitter {
     let mut len = emit_restore_carry(exec);
     len += emit_add_register_8_with_carry(map_register_8(dest), map_register_8(src), &mut exec[len..]);
     len += emit_store_flags(0xf0, false, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_add_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_push_register(X86Reg64::RDX, exec);
+    len += emit_hl_indirect_read(self.mem as usize, &mut exec[len..]);
+    len += emit_add_register_8(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0xf0, false, &mut exec[len..]);
+    len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_add_indirect_with_carry(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_push_register(X86Reg64::RDX, exec);
+    len += emit_hl_indirect_read(self.mem as usize, &mut exec[len..]);
+    len += emit_restore_carry(&mut exec[len..]);
+    len += emit_add_register_8_with_carry(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0xf0, false, &mut exec[len..]);
+    len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
@@ -173,6 +215,17 @@ impl Emitter {
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
+  pub fn encode_and_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_push_register(X86Reg64::RDX, exec);
+    len += emit_hl_indirect_read(self.mem as usize, &mut exec[len..]);
+    len += emit_and_register_8(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0x80, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x05, &mut exec[len..]);
+    len += emit_force_flags_on(0x20, &mut exec[len..]);
+    len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
   pub fn encode_or_register_8(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_or_register_8(map_register_8(dest), map_register_8(src), exec);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
@@ -180,10 +233,30 @@ impl Emitter {
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
+  pub fn encode_or_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_push_register(X86Reg64::RDX, exec);
+    len += emit_hl_indirect_read(self.mem as usize, &mut exec[len..]);
+    len += emit_or_register_8(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0x80, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x07, &mut exec[len..]);
+    len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
   pub fn encode_xor_register_8(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_xor_register_8(map_register_8(dest), map_register_8(src), exec);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
     len += emit_force_flags_off(0x07, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_xor_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_push_register(X86Reg64::RDX, exec);
+    len += emit_hl_indirect_read(self.mem as usize, &mut exec[len..]);
+    len += emit_xor_register_8(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0x80, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x07, &mut exec[len..]);
+    len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
@@ -611,9 +684,9 @@ fn emit_store_flags(mask: u8, negative: bool, exec: &mut [u8]) -> usize {
   }
 }
 
+/// This destroys $al, it should only be used in methods that modify all flags
 fn emit_restore_carry(exec: &mut [u8]) -> usize {
   let code = [
-    0x41, 0x88, 0xc0, // mov r8b, al
     0x24, 0x10, // and al, 0x10 ; isolate the carry bit
     0x04, 0xf0, // add al, 0xf0 ; if bit 4 is set, this will cause a carry
   ];
@@ -623,7 +696,7 @@ fn emit_restore_carry(exec: &mut [u8]) -> usize {
 }
 
 fn emit_increment_8(dest: X86Reg8, exec: &mut [u8]) -> usize {
-  exec[0] = 0xfe;
+  exec[0] = 0xfe; // inc dest
   exec[1] = match dest {
     X86Reg8::AL => 0xc0,
     X86Reg8::CL => 0xc1,
@@ -1227,6 +1300,157 @@ fn emit_pop(dest: X86Reg16, memory_base: usize, exec: &mut [u8]) -> usize {
   length
 }
 
+fn emit_hl_indirect_partial_read(memory_base: usize, exec: &mut [u8]) -> usize {
+  let fn_pointer = address_as_bytes(crate::mem::memory_read_byte as u64);
+  let memory_pointer = address_as_bytes(memory_base as u64);
+  let code = [
+    0x50, // push rax
+    0x51, // push rcx
+    0x52, // push rdx
+    0x48, 0x89, 0xce, // mov rsi, rcx
+    0x48, 0xbf, // movabs rdi, memory_pointer
+      memory_pointer[0],
+      memory_pointer[1],
+      memory_pointer[2],
+      memory_pointer[3],
+      memory_pointer[4],
+      memory_pointer[5],
+      memory_pointer[6],
+      memory_pointer[7],
+
+    0x48, 0xb8, // movabs rax, fn_pointer
+      fn_pointer[0],
+      fn_pointer[1],
+      fn_pointer[2],
+      fn_pointer[3],
+      fn_pointer[4],
+      fn_pointer[5],
+      fn_pointer[6],
+      fn_pointer[7],
+    0xff, 0xd0, // call rax
+    0x48, 0x89, 0xc2, // mov rdx, rax
+    0x66, 0x8b, 0x44, 0x24, 0x10, // mov ax, [rsp + 16]
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
+}
+
+fn emit_hl_indirect_partial_write(memory_base: usize, exec: &mut [u8]) -> usize {
+  let fn_pointer = address_as_bytes(crate::mem::memory_write_byte as u64);
+  let memory_pointer = address_as_bytes(memory_base as u64);
+  let code = [
+    0x88, 0x44, 0x24, 0x10, // mov [rsp + 16], al
+    0x48, 0x8b, 0x74, 0x24, 0x08, // mov rsi, [rsp + 8]
+    0x48, 0xbf, // movabs rdi, memory_pointer
+      memory_pointer[0],
+      memory_pointer[1],
+      memory_pointer[2],
+      memory_pointer[3],
+      memory_pointer[4],
+      memory_pointer[5],
+      memory_pointer[6],
+      memory_pointer[7],
+
+    0x48, 0xb8, // movabs rax, fn_pointer
+      fn_pointer[0],
+      fn_pointer[1],
+      fn_pointer[2],
+      fn_pointer[3],
+      fn_pointer[4],
+      fn_pointer[5],
+      fn_pointer[6],
+      fn_pointer[7],
+    0xff, 0xd0, // call rax
+    0x5a, // pop rdx
+    0x59, // pop rcx
+    0x58, // pop rax
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
+}
+
+/// Read the value stored at (HL) into E
+/// Make sure $rdx can be restored after this result is used
+fn emit_hl_indirect_read(memory_base: usize, exec: &mut [u8]) -> usize {
+  let fn_pointer = address_as_bytes(crate::mem::memory_read_byte as u64);
+  let memory_pointer = address_as_bytes(memory_base as u64);
+  let code = [
+    0x50, // push rax
+    0x51, // push rcx
+    0x48, 0x89, 0xce, // mov rsi, rcx
+    0x48, 0xbf, // movabs rdi, memory_pointer
+      memory_pointer[0],
+      memory_pointer[1],
+      memory_pointer[2],
+      memory_pointer[3],
+      memory_pointer[4],
+      memory_pointer[5],
+      memory_pointer[6],
+      memory_pointer[7],
+
+    0x48, 0xb8, // movabs rax, fn_pointer
+      fn_pointer[0],
+      fn_pointer[1],
+      fn_pointer[2],
+      fn_pointer[3],
+      fn_pointer[4],
+      fn_pointer[5],
+      fn_pointer[6],
+      fn_pointer[7],
+    0xff, 0xd0, // call rax
+    0x48, 0x89, 0xc2, // mov rdx, rax
+    0x59, // pop rcx
+    0x58, // pop rax
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
+}
+
+fn emit_push_register(reg: X86Reg64, exec: &mut [u8]) -> usize {
+  match reg {
+    X86Reg64::RAX => {
+      exec[0] = 0x50;
+      1
+    },
+    X86Reg64::RBX => {
+      exec[0] = 0x53;
+      1
+    },
+    X86Reg64::RCX => {
+      exec[0] = 0x51;
+      1
+    },
+    X86Reg64::RDX => {
+      exec[0] = 0x52;
+      1
+    },
+  }
+}
+
+fn emit_pop_register(reg: X86Reg64, exec: &mut [u8]) -> usize {
+  match reg {
+    X86Reg64::RAX => {
+      exec[0] = 0x58;
+      1
+    },
+    X86Reg64::RBX => {
+      exec[0] = 0x5b;
+      1
+    },
+    X86Reg64::RCX => {
+      exec[0] = 0x59;
+      1
+    },
+    X86Reg64::RDX => {
+      exec[0] = 0x5a;
+      1
+    },
+  }
+}
+
 fn address_as_bytes(addr: u64) -> [u8; 8] {
   [
     (addr & 0xff) as u8,
@@ -1330,4 +1554,11 @@ enum X86Reg16 {
   DX,
   R12,
   R13,
+}
+
+enum X86Reg64 {
+  RAX,
+  RBX,
+  RCX,
+  RDX,
 }

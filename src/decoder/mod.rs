@@ -217,7 +217,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0x83 => (Op::Add8(Register8::A, Register8::E), 1, 4),
     0x84 => (Op::Add8(Register8::A, Register8::H), 1, 4),
     0x85 => (Op::Add8(Register8::A, Register8::L), 1, 4),
-
+    0x86 => (Op::AddIndirect, 1, 8),
     0x87 => (Op::Add8(Register8::A, Register8::A), 1, 4),
     0x88 => (Op::AddWithCarry8(Register8::A, Register8::B), 1, 4),
     0x89 => (Op::AddWithCarry8(Register8::A, Register8::C), 1, 4),
@@ -225,7 +225,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0x8b => (Op::AddWithCarry8(Register8::A, Register8::E), 1, 4),
     0x8c => (Op::AddWithCarry8(Register8::A, Register8::H), 1, 4),
     0x8d => (Op::AddWithCarry8(Register8::A, Register8::L), 1, 4),
-
+    0x8e => (Op::AddIndirectWithCarry, 1, 8),
     0x8f => (Op::AddWithCarry8(Register8::A, Register8::A), 1, 4),
 
     0x90 => (Op::Sub8(Register8::A, Register8::B), 1, 4),
@@ -251,7 +251,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0xa3 => (Op::And8(Register8::A, Register8::E), 1, 4),
     0xa4 => (Op::And8(Register8::A, Register8::H), 1, 4),
     0xa5 => (Op::And8(Register8::A, Register8::L), 1, 4),
-
+    0xa6 => (Op::AndIndirect, 1, 8),
     0xa7 => (Op::And8(Register8::A, Register8::A), 1, 4),
     0xa8 => (Op::Xor8(Register8::A, Register8::B), 1, 4),
     0xa9 => (Op::Xor8(Register8::A, Register8::C), 1, 4),
@@ -259,7 +259,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0xab => (Op::Xor8(Register8::A, Register8::E), 1, 4),
     0xac => (Op::Xor8(Register8::A, Register8::H), 1, 4),
     0xad => (Op::Xor8(Register8::A, Register8::L), 1, 4),
-
+    0xae => (Op::XorIndirect, 1, 8),
     0xaf => (Op::Xor8(Register8::A, Register8::A), 1, 4),
 
     0xb0 => (Op::Or8(Register8::A, Register8::B), 1, 4),
@@ -268,7 +268,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0xb3 => (Op::Or8(Register8::A, Register8::E), 1, 4),
     0xb4 => (Op::Or8(Register8::A, Register8::H), 1, 4),
     0xb5 => (Op::Or8(Register8::A, Register8::L), 1, 4),
-
+    0xb6 => (Op::OrIndirect, 1, 8),
     0xb7 => (Op::Or8(Register8::A, Register8::A), 1, 4),
     0xb8 => (Op::Compare8(Register8::A, Register8::B), 1, 4),
     0xb9 => (Op::Compare8(Register8::A, Register8::C), 1, 4),
