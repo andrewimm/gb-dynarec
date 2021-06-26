@@ -56,6 +56,9 @@ pub enum Op {
   Call(JumpCondition, u16),
   Return(JumpCondition),
   ResetVector(u16),
+  ReturnFromInterrupt,
+  Push(Register16),
+  Pop(Register16),
 }
 
 impl Op {

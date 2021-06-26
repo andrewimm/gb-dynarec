@@ -92,8 +92,11 @@ impl Emitter {
       Op::LoadStackPointerToMemory(addr) => self.encode_load_stack_to_memory(addr, ip_increment, exec),
       Op::LoadAToMemory(addr) => self.encode_load_a_to_memory(addr, ip_increment, exec),
       Op::LoadAFromMemory(addr) => self.encode_load_a_from_memory(addr, ip_increment, exec),
+      Op::Push(reg) => self.encode_push(reg, ip_increment, exec),
+      Op::Pop(reg) => self.encode_pop(reg, ip_increment, exec),
 
       Op::Jump(cond, address) => self.encode_jump(cond, address, exec),
+      Op::JumpRelative(cond, offset) => self.encode_jump_relative(cond, offset, exec),
 
       Op::Invalid(code) => panic!("Invalid OP: {:#04x}", code),
       _ => panic!("unsupported op"),
@@ -332,6 +335,18 @@ impl Emitter {
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
+  pub fn encode_push(&self, reg: Register16, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let source = map_register_16(reg);
+    let len = emit_push(source, self.mem as usize, exec);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_pop(&self, reg: Register16, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let dest = map_register_16(reg);
+    let len = emit_pop(dest, self.mem as usize, exec);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
   pub fn encode_jump(&self, condition: JumpCondition, address: u16, exec: &mut [u8]) -> usize {
     let mut len;
     match condition {
@@ -374,6 +389,15 @@ impl Emitter {
         len += emit_jump_nonzero(5, &mut exec[len..]);
         len += emit_move_16(X86Reg16::R13, address, &mut exec[len..]);
       },
+    }
+    len
+  }
+
+  pub fn encode_jump_relative(&self, condition: JumpCondition, offset: i8, exec: &mut [u8]) -> usize {
+    let mut len;
+    match condition {
+      JumpCondition::Always => return emit_relative_jump(offset, exec),
+      _ => panic!("not implemented"),
     }
     len
   }
@@ -708,6 +732,16 @@ fn emit_jump(addr: u16, exec: &mut [u8]) -> usize {
   exec[2] = 0xbd;
   emit_immediate_u16(addr, &mut exec[3..]);
   5
+}
+
+fn emit_relative_jump(offset: i8, exec: &mut [u8]) -> usize {
+  let code = [
+    0x49, 0x83, 0xc5, 0x02, // add r13, 2
+    0x66, 0x41, 0x83, 0xc5, offset as u8, // add r13w, offset
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
 }
 
 fn emit_flag_test(test: u8, exec: &mut [u8]) -> usize {
@@ -1060,6 +1094,111 @@ fn emit_read_a_from_memory(exec: &mut [u8], memory_base: usize, address: u16) ->
   ];
   let length = code.len();
   exec[..length].copy_from_slice(&code);
+  length
+}
+
+fn emit_push(source: X86Reg16, memory_base: usize, exec: &mut [u8]) -> usize {
+  let fn_pointer = address_as_bytes(crate::mem::memory_write_word as u64);
+  let memory_pointer = address_as_bytes(memory_base as u64);
+  let source_byte = match source {
+    X86Reg16::AX => 0xc2,
+    X86Reg16::BX => 0xda,
+    X86Reg16::CX => 0xca,
+    X86Reg16::DX => 0xd2,
+    _ => unreachable!("Unsupported push register"),
+  };
+  let code = [
+    0x50, // push rax
+    0x51, // push rcx
+    0x52, // push rdx
+    0x49, 0x83, 0xec, 0x02, // sub r12, 2
+    0x49, 0x81, 0xe4, 0xff, 0xff, 0x00, 0x00, // and r12, 0xffff
+    0x4c, 0x89, 0xe6, // mov rsi, r12
+    0x48, 0xbf, // movabs rdi, memory_pointer
+      memory_pointer[0],
+      memory_pointer[1],
+      memory_pointer[2],
+      memory_pointer[3],
+      memory_pointer[4],
+      memory_pointer[5],
+      memory_pointer[6],
+      memory_pointer[7],
+    0x66, 0x89, source_byte, // mov dx, source
+    0x48, 0x81, 0xe2, 0xff, 0xff, 0x00, 0x00, // and rdx, 0xffff
+
+    0x48, 0xb8, // movabs rax, fn_pointer
+      fn_pointer[0],
+      fn_pointer[1],
+      fn_pointer[2],
+      fn_pointer[3],
+      fn_pointer[4],
+      fn_pointer[5],
+      fn_pointer[6],
+      fn_pointer[7],
+    0xff, 0xd0, // call rax
+    0x5a, // pop rdx
+    0x59, // pop rcx
+    0x58, // pop rax
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
+}
+
+fn emit_pop(dest: X86Reg16, memory_base: usize, exec: &mut [u8]) -> usize {
+  let fn_pointer = address_as_bytes(crate::mem::memory_read_word as u64);
+  let memory_pointer = address_as_bytes(memory_base as u64);
+  let stack_offset = match dest {
+    X86Reg16::AX => 24,
+    X86Reg16::BX => 0,
+    X86Reg16::CX => 16,
+    X86Reg16::DX => 8,
+    _ => unreachable!("Unsupported push register"),
+  };
+  let code = [
+    0x50, // push rax
+    0x51, // push rcx
+    0x52, // push rdx
+    0x53, // push rbx
+    0x4c, 0x89, 0xe6, // mov rsi, r12
+    0x49, 0x83, 0xc4, 0x02, // add r12, 2
+    0x49, 0x81, 0xe4, 0xff, 0xff, 0x00, 0x00, // and r12, 0xffff
+    0x48, 0xbf, // movabs rdi, memory_pointer
+      memory_pointer[0],
+      memory_pointer[1],
+      memory_pointer[2],
+      memory_pointer[3],
+      memory_pointer[4],
+      memory_pointer[5],
+      memory_pointer[6],
+      memory_pointer[7],
+    0x48, 0xb8, // movabs rax, fn_pointer
+      fn_pointer[0],
+      fn_pointer[1],
+      fn_pointer[2],
+      fn_pointer[3],
+      fn_pointer[4],
+      fn_pointer[5],
+      fn_pointer[6],
+      fn_pointer[7],
+    0xff, 0xd0, // call rax
+    0x66, 0x89, 0x44, 0x24, stack_offset, // mov [rsp + stack_offset], ax
+
+    0x5b, // pop rbx
+    0x5a, // pop rdx
+    0x59, // pop rcx
+    0x58, // pop rax
+  ];
+  let mut length = code.len();
+  exec[..length].copy_from_slice(&code);
+  if let X86Reg16::AX = dest {
+    // need to clear the lower 4 bits of al
+    // and al, 0xf0
+    exec[length] = 0x24;
+    length += 1;
+    exec[length] = 0xf0;
+    length += 1;
+  }
   length
 }
 

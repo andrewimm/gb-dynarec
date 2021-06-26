@@ -279,6 +279,8 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
 
     0xbf => (Op::Compare8(Register8::A, Register8::A), 1, 4),
 
+    0xc0 => (Op::Return(JumpCondition::NonZero), 1, 8),
+    0xc1 => (Op::Pop(Register16::BC), 1, 12),
     0xc2 => {
       let addr = read_u16(&instructions[1..]);
       let op = Op::Jump(JumpCondition::NonZero, addr);
@@ -294,38 +296,107 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       let op = Op::Call(JumpCondition::NonZero, addr);
       (op, 3, 12)
     },
-
+    0xc5 => (Op::Push(Register16::BC), 1, 16),
     0xc6 => {
       let value = instructions[1];
       let op = Op::AddAbsolute8(value);
       (op, 2, 8)
     },
-
+    0xc7 => (Op::ResetVector(0x00), 1, 16),
+    0xc8 => (Op::Return(JumpCondition::Zero), 1, 8),
+    0xc9 => (Op::Return(JumpCondition::Always), 1, 16),
     0xca => {
       let addr = read_u16(&instructions[1..]);
       let op = Op::Jump(JumpCondition::Zero, addr);
       (op, 3, 12)
     },
     0xcb => decode_cb(&instructions[1..]),
-
+    0xcc => {
+      let addr = read_u16(&instructions[1..]);
+      let op = Op::Call(JumpCondition::Zero, addr);
+      (op, 3, 12)
+    },
     0xcd => {
       let addr = read_u16(&instructions[1..]);
       let op = Op::Call(JumpCondition::Always, addr);
       (op, 3, 24)
     },
-
+    0xce => {
+      let value = instructions[1];
+      let op = Op::AddAbsoluteWithCarry8(value);
+      (op, 2, 8)
+    },
+    0xcf => (Op::ResetVector(0x08), 1, 16),
+    0xd0 => (Op::Return(JumpCondition::NoCarry), 1, 8),
+    0xd1 => (Op::Pop(Register16::DE), 1, 12),
+    0xd2 => {
+      let addr = read_u16(&instructions[1..]);
+      let op = Op::Jump(JumpCondition::NoCarry, addr);
+      (op, 3, 12)
+    },
+    // d3 invalid
+    0xd4 => {
+      let addr = read_u16(&instructions[1..]);
+      let op = Op::Call(JumpCondition::NoCarry, addr);
+      (op, 3, 12)
+    },
+    0xd5 => (Op::Push(Register16::DE), 1, 16),
+    0xd6 => {
+      let value = instructions[1];
+      let op = Op::SubAbsolute8(value);
+      (op, 2, 8)
+    },
+    0xd7 => (Op::ResetVector(0x10), 1, 16),
+    0xd8 => (Op::Return(JumpCondition::Carry), 1, 8),
+    0xd9 => (Op::ReturnFromInterrupt, 1, 16),
+    0xda => {
+      let addr = read_u16(&instructions[1..]);
+      let op = Op::Jump(JumpCondition::Carry, addr);
+      (op, 3, 12)
+    },
+    // db invalid
+    0xdc => {
+      let addr = read_u16(&instructions[1..]);
+      let op = Op::Call(JumpCondition::Carry, addr);
+      (op, 3, 12)
+    },
+    // dd invalid
+    0xde => {
+      let value = instructions[1];
+      let op = Op::SubAbsoluteWithCarry8(value);
+      (op, 2, 8)
+    },
+    0xdf => (Op::ResetVector(0x18), 1, 16),
     0xe0 => {
       let addr_low = instructions[1] as u16;
       let addr = 0xff00 | addr_low;
       let op = Op::LoadAToMemory(addr);
       (op, 2, 12)
     },
+    0xe1 => (Op::Pop(Register16::HL), 1, 12),
+    
+    0xe5 => (Op::Push(Register16::HL), 1, 12),
+    0xe6 => {
+      let value = instructions[1];
+      let op = Op::AndAbsolute8(value);
+      (op, 2, 8)
+    },
+    0xe7 => (Op::ResetVector(0x20), 1, 16),
 
     0xea => {
       let addr = read_u16(&instructions[1..]);
       let op = Op::LoadAToMemory(addr);
       (op, 3, 16)
     },
+    // eb invalid
+    // ec invalid
+    // ed invalid
+    0xee => {
+      let value = instructions[1];
+      let op = Op::XorAbsolute8(value);
+      (op, 2, 8)
+    },
+    0xef => (Op::ResetVector(0x28), 1, 16),
 
     0xf0 => {
       let addr_low = instructions[1] as u16;
@@ -333,12 +404,28 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       let op = Op::LoadAFromMemory(addr);
       (op, 2, 12)
     },
+    0xf1 => (Op::Pop(Register16::AF), 1, 12),
+
+    0xf5 => (Op::Push(Register16::AF), 1, 12),
+    0xf6 => {
+      let value = instructions[1];
+      let op = Op::OrAbsolute8(value);
+      (op, 2, 8)
+    },
+    0xf7 => (Op::ResetVector(0x30), 1, 16),
 
     0xfa => {
       let addr = read_u16(&instructions[1..]);
       let op = Op::LoadAFromMemory(addr);
       (op, 3, 16)
     },
+
+    0xfe => {
+      let value = instructions[1];
+      let op = Op::CompareAbsolute8(value);
+      (op, 2, 8)
+    },
+    0xff => (Op::ResetVector(0x38), 1, 16),
 
     _ => (Op::Invalid(instructions[0]), 1, 4),
   }

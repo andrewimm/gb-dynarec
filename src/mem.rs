@@ -95,3 +95,9 @@ pub extern "sysv64" fn memory_write_word(areas: *mut MemoryAreas, addr: u16, val
   memory_write_byte(areas, addr, low);
   memory_write_byte(areas, addr + 1, high);
 }
+
+pub extern "sysv64" fn memory_read_word(areas: *mut MemoryAreas, addr: u16) -> u16 {
+  let low = memory_read_byte(areas, addr) as u16;
+  let high = memory_read_byte(areas, addr + 1) as u16;
+  (high << 8) | low
+}

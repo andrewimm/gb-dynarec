@@ -940,6 +940,65 @@ mod tests {
   }
 
   #[test]
+  fn push_pop() {
+    let code = vec![
+      0x31, 0x00, 0xc1, // LD SP, 0xc100
+      0x06, 0x14, // LD B, 0x14
+      0x0e, 0x53, // LD C, 0x53
+      0xc5, // PUSH BC
+      0xc3, 0x0b, 0x00, // JP 0x000b
+      0x16, 0x66, // LD D, 0x66
+      0x1e, 0x33, // LD E, 0x33
+      0xd5, // PUSH DE
+      0xc3, 0x13, 0x00, // JP 0x0013
+      0x26, 0x40, // LD H, 0x40
+      0x2e, 0xfa, // LD L, 0xfa
+      0xe5, // PUSH HL
+      0xc3, 0x1b, 0x00, // JP 0x001b
+      0x3e, 0x50, // LD A, 0x50
+      0xa7, // AND A
+      0xf5, // PUSH AF
+      0xc3, 0x22, 0x00, // JP 0x0022
+      0xc1, // POP BC
+      0xc3, 0x26, 0x00, // JP 0x0026
+      0xd1, // POP DE
+      0xc3, 0x2a, 0x00, // JP 0x002a
+      0xe1, // POP HL
+      0xc3, 0x2e, 0x00, // JP 0x002e,
+      0xf1, // POP AF
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc0fe);
+    assert_eq!(core.memory.work_ram[0xff], 0x14);
+    assert_eq!(core.memory.work_ram[0xfe], 0x53);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc0fc);
+    assert_eq!(core.memory.work_ram[0xfd], 0x66);
+    assert_eq!(core.memory.work_ram[0xfc], 0x33);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc0fa);
+    assert_eq!(core.memory.work_ram[0xfb], 0x40);
+    assert_eq!(core.memory.work_ram[0xfa], 0xfa);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc0f8);
+    assert_eq!(core.memory.work_ram[0xf9], 0x50);
+    assert_eq!(core.memory.work_ram[0xf8], 0x20);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc0fa);
+    assert_eq!(core.registers.get_bc(), 0x5020);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc0fc);
+    assert_eq!(core.registers.get_de(), 0x40fa);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc0fe);
+    assert_eq!(core.registers.get_hl(), 0x6633);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc100);
+    assert_eq!(core.registers.get_af(), 0x1450);
+  }
+
+  #[test]
   fn absolute_jump() {
     let code = vec![
       0x3e, 0x0a, // MOV A, 0x0a
