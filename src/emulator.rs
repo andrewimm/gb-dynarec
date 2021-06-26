@@ -1042,4 +1042,39 @@ mod tests {
     assert_eq!(core.registers.get_af(), 0x2000);
     assert_eq!(core.registers.get_bc(), 0x1000);
   }
+
+  #[test]
+  fn relative_jump() {
+    let code = vec![
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x18, 0x04,
+      0x00,
+      0x00,
+      0x00,
+      0x00,
+      0x18, 0xfe,
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x0a);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x0a);
+  }
+
+  #[test]
+  fn conditional_relative_jump() {
+    let code = vec![
+      0x28, 0x10, // JR Z, 0x10
+      0xa7, // AND A
+      0x28, 0x10, // JR Z, 0x10
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x02);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x15);
+  }
 }

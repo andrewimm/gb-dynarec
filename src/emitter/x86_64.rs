@@ -396,8 +396,34 @@ impl Emitter {
   pub fn encode_jump_relative(&self, condition: JumpCondition, offset: i8, exec: &mut [u8]) -> usize {
     let mut len;
     match condition {
-      JumpCondition::Always => return emit_relative_jump(offset, exec),
-      _ => panic!("not implemented"),
+      JumpCondition::Always => {
+        len = emit_ip_increment(2, exec);
+        len += emit_ip_signed_offset(offset, &mut exec[len..]);
+      },
+      JumpCondition::Zero => {
+        len = emit_ip_increment(2, exec);
+        len += emit_flag_test(0x80, &mut exec[len..]);
+        len += emit_jump_zero(5, &mut exec[len..]);
+        len += emit_ip_signed_offset(offset, &mut exec[len..]);
+      },
+      JumpCondition::NonZero => {
+        len = emit_ip_increment(2, exec);
+        len += emit_flag_test(0x80, &mut exec[len..]);
+        len += emit_jump_nonzero(5, &mut exec[len..]);
+        len += emit_ip_signed_offset(offset, &mut exec[len..]);
+      },
+      JumpCondition::Carry => {
+        len = emit_ip_increment(3, exec);
+        len += emit_flag_test(0x10, &mut exec[len..]);
+        len += emit_jump_zero(5, &mut exec[len..]);
+        len += emit_ip_signed_offset(offset, &mut exec[len..]);
+      },
+      JumpCondition::NoCarry => {
+        len = emit_ip_increment(3, exec);
+        len += emit_flag_test(0x10, &mut exec[len..]);
+        len += emit_jump_nonzero(5, &mut exec[len..]);
+        len += emit_ip_signed_offset(offset, &mut exec[len..]);
+      },
     }
     len
   }
@@ -734,16 +760,6 @@ fn emit_jump(addr: u16, exec: &mut [u8]) -> usize {
   5
 }
 
-fn emit_relative_jump(offset: i8, exec: &mut [u8]) -> usize {
-  let code = [
-    0x49, 0x83, 0xc5, 0x02, // add r13, 2
-    0x66, 0x41, 0x83, 0xc5, offset as u8, // add r13w, offset
-  ];
-  let length = code.len();
-  exec[..length].copy_from_slice(&code);
-  length
-}
-
 fn emit_flag_test(test: u8, exec: &mut [u8]) -> usize {
   // test al, value
   exec[0] = 0xa8;
@@ -800,6 +816,15 @@ fn emit_ip_increment(amount: usize, exec: &mut [u8]) -> usize {
   exec[2] = 0xc5;
   exec[3] = amount as u8;
   4
+}
+
+fn emit_ip_signed_offset(offset: i8, exec: &mut [u8]) -> usize {
+  exec[0] = 0x66; // add r13w, offset
+  exec[1] = 0x41;
+  exec[2] = 0x83;
+  exec[3] = 0xc5;
+  exec[4] = offset as u8;
+  5
 }
 
 fn emit_register_or(reg: X86Reg8, mask: u8, exec: &mut [u8]) -> usize {
