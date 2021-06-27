@@ -73,6 +73,9 @@ impl Op {
       Op::JumpHL => true,
       Op::JumpRelative(_, _) => true,
       Op::Call(_, _) => true,
+      Op::ResetVector(_) => true,
+      Op::Return(_) => true,
+      Op::ReturnFromInterrupt => true,
       _ => false,
     }
   }

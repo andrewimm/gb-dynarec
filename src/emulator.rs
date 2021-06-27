@@ -1186,4 +1186,75 @@ mod tests {
     core.run_code_block();
     assert_eq!(core.registers.get_ip(), 0x15);
   }
+
+  #[test]
+  fn subroutine_call() {
+    let code = vec![
+      0x31, 0x00, 0xc1, // LD SP, 0xc100
+      0xcd, 0x10, 0x00, // CALL 0x0010
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc0fe);
+    assert_eq!(core.registers.get_ip(), 0x10);
+    assert_eq!(core.memory.work_ram[0xff], 0x00);
+    assert_eq!(core.memory.work_ram[0xfe], 0x06);
+  }
+
+  #[test]
+  fn conditional_call() {
+    let code = vec![
+      0x31, 0x00, 0xc1, // LD SP, 0xc100
+      0xcc, 0x14, 0x00, // CALL Z, 0x0014
+      0xdc, 0x50, 0x00, // CALL C, 0x0050
+      0xc4, 0x0f, 0x00, // CALL NZ, 0x000f
+      0x00, 0x00, 0x00, 0x00,
+      0xa7, // AND A
+      0xd4, 0x03, 0x00, // CALL NC, 0x0003
+      0xc6, 0xf0, // ADD A, 0xf0
+      0xc6, 0xf0, // ADD A, 0xf0
+      0xdc, 0x40, 0x00, // CALL C, 0x40
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc100);
+    assert_eq!(core.registers.get_ip(), 0x06);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc100);
+    assert_eq!(core.registers.get_ip(), 0x09);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc0fe);
+    assert_eq!(core.registers.get_ip(), 0x0f);
+    assert_eq!(core.memory.work_ram[0xff], 0x00);
+    assert_eq!(core.memory.work_ram[0xfe], 0x0c);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc0fc);
+    assert_eq!(core.registers.get_ip(), 0x03);
+    assert_eq!(core.memory.work_ram[0xfd], 0x00);
+    assert_eq!(core.memory.work_ram[0xfc], 0x14);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc0fa);
+    assert_eq!(core.registers.get_ip(), 0x14);
+    assert_eq!(core.memory.work_ram[0xfb], 0x00);
+    assert_eq!(core.memory.work_ram[0xfa], 0x06);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc0f8);
+    assert_eq!(core.registers.get_ip(), 0x40);
+    assert_eq!(core.memory.work_ram[0xf9], 0x00);
+    assert_eq!(core.memory.work_ram[0xf8], 0x1b);
+  }
+
+  #[test]
+  fn rst() {
+    let code = vec![
+      0x31, 0x00, 0xc1, // LD SP, 0xc100
+      0xe7, // RST 0x20
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc0fe);
+    assert_eq!(core.registers.get_ip(), 0x20);
+    assert_eq!(core.memory.work_ram[0xff], 0x00);
+    assert_eq!(core.memory.work_ram[0xfe], 0x04);
+  }
 }
