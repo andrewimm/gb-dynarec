@@ -67,11 +67,11 @@ impl CodeCache {
     starting_offset
   }
 
-  pub fn call(&self, offset: usize, registers: &mut Registers) {
+  pub fn call(&self, offset: usize, registers: &mut Registers) -> u8 {
     let func_pointer = (self.get_memory_start_address() + offset) as *const ();
-    let func: extern "C" fn(*const Registers) -> usize = unsafe {
+    let func: extern "sysv64" fn(*const Registers) -> u8 = unsafe {
       std::mem::transmute(func_pointer)
     };
-    func(registers as *const Registers);
+    func(registers as *const Registers)
   }
 }

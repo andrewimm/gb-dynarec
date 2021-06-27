@@ -1,3 +1,4 @@
+use crate::cpu;
 use crate::decoder::ops::{Op, IndirectLocation, JumpCondition, Register8, Register16, Source8};
 use crate::mem::MemoryAreas;
 
@@ -18,6 +19,9 @@ impl Emitter {
       0x53, // push rbx
       0x41, 0x54, // push r12
       0x41, 0x55, // push r13
+      0x41, 0x56, // push r14
+      // set initial return code
+      0x4d, 0x31, 0xf6, // xor r14, r14
       // begin method, load all registers from a struct in memory
       // the only argument (rdi) will be a pointer to the struct
       0x8b, 0x07, // mov eax, [rdi]
@@ -43,7 +47,10 @@ impl Emitter {
       0x89, 0x4f, 0x0c, // mov [rdi + 12], ecx
       0x66, 0x44, 0x89, 0x67, 0x10, // mov [rdi + 16], r12w
       0x66, 0x44, 0x89, 0x6f, 0x14, // mov [rdi + 20], r13w
+      // Set return value from r14
+      0x4c, 0x89, 0xf0, // mov rax, r14
       // Restore scratch registers to their original value
+      0x41, 0x5e, // pop r14
       0x41, 0x5d, // pop r13
       0x41, 0x5c, // pop r12
       0x5b, // pop rbx
@@ -107,6 +114,12 @@ impl Emitter {
       Op::Call(cond, address) => self.encode_call(cond, address, exec),
       Op::ResetVector(vector) => self.encode_reset(vector, exec),
       Op::Return(cond) => self.encode_return(cond, exec),
+      Op::ReturnFromInterrupt => self.encode_return_from_interrupt(exec),
+
+      Op::Stop => self.encode_stop(ip_increment, exec),
+      Op::Halt => self.encode_halt(ip_increment, exec),
+      Op::InterruptEnable => self.encode_interrupt_enable(ip_increment, exec),
+      Op::InterruptDisable => self.encode_interrupt_disable(ip_increment, exec),
 
       Op::Invalid(code) => panic!("Invalid OP: {:#04x}", code),
       _ => panic!("unsupported op"),
@@ -115,6 +128,26 @@ impl Emitter {
 
   pub fn encode_noop(&self, exec: &mut [u8]) -> usize {
     emit_ip_increment(1, exec)
+  }
+
+  pub fn encode_stop(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let len = emit_return_code(cpu::STATUS_STOP, exec);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_halt(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let len = emit_return_code(cpu::STATUS_HALT, exec);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_interrupt_enable(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let len = emit_return_code(cpu::STATUS_INTERRUPT_ENABLE, exec);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_interrupt_disable(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let len = emit_return_code(cpu::STATUS_INTERRUPT_DISABLE, exec);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
   pub fn encode_load_16(&self, dest: Register16, value: u16, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -607,11 +640,23 @@ impl Emitter {
     }
     len
   }
+
+  pub fn encode_return_from_interrupt(&self, exec: &mut [u8]) -> usize {
+    let len = emit_pop(X86Reg16::R13, self.mem as usize, exec);
+    len + emit_return_code(cpu::STATUS_INTERRUPT_ENABLE, &mut exec[len..])
+  }
 }
 
 fn emit_immediate_u16(value: u16, exec: &mut [u8]) {
   exec[0] = (value & 0xff) as u8;
   exec[1] = (value >> 8) as u8;
+}
+
+fn emit_return_code(code: u8, exec: &mut [u8]) -> usize {
+  exec[0] = 0x41; // mov r14b, code
+  exec[1] = 0xb6;
+  exec[2] = code;
+  3
 }
 
 fn emit_move_16(dest: X86Reg16, value: u16, exec: &mut [u8]) -> usize {

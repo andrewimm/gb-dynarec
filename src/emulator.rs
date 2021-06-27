@@ -1,12 +1,20 @@
 use crate::cache::CodeCache;
-use crate::cpu::Registers;
+use crate::cpu::{self, Registers};
 use crate::mem::MemoryAreas;
+
+#[derive(Debug, Eq, PartialEq)]
+pub enum RunState {
+  Run,
+  Stop,
+  Halt,
+}
 
 pub struct Core {
   pub cache: CodeCache,
   pub registers: Registers,
-
   pub memory: MemoryAreas,
+  pub interrupts_enabled: bool,
+  pub run_state: RunState,
 }
 
 impl Core {
@@ -15,6 +23,8 @@ impl Core {
       cache: CodeCache::new(),
       registers: Registers::new(),
       memory: MemoryAreas::with_rom(code),
+      interrupts_enabled: false,
+      run_state: RunState::Run,
     }
   }
 
@@ -29,14 +39,33 @@ impl Core {
         self.cache.translate_code_block(&self.memory.rom, ip, self.memory.as_ptr())
       }
     };
-    self.cache.call(address, &mut self.registers);
-    println!("{:?}", self.registers);
+    let result = self.cache.call(address, &mut self.registers);
+    match result {
+      cpu::STATUS_STOP => {
+        self.run_state = RunState::Stop;
+        println!("STOP");
+      },
+      cpu::STATUS_HALT => {
+        self.run_state = RunState::Halt;
+        println!("HALT");
+      },
+      cpu::STATUS_INTERRUPT_DISABLE => {
+        self.interrupts_enabled = false;
+        println!("DISABLE INT");
+      },
+      cpu::STATUS_INTERRUPT_ENABLE => {
+        self.interrupts_enabled = true;
+        println!("ENABLE INT");
+      },
+      _ => (),
+    }
+    println!("[{}] {:?}", result, self.registers);
   }
 }
 
 #[cfg(test)]
 mod tests {
-  use super::Core;
+  use super::{Core, RunState};
 
   #[test]
   fn load_8_bit_absolute() {
@@ -1312,5 +1341,43 @@ mod tests {
     assert_eq!(core.registers.get_ip(), 0x13);
     core.run_code_block();
     assert_eq!(core.registers.get_ip(), 0x20);
+  }
+
+  #[test]
+  fn reti() {
+    let code = vec![
+      0x31, 0x00, 0xc1, // LD SP, 0xc100
+      0xcd, 0x08, 0x00, // CALL 0x0008
+      0x00, 0x00,
+      0xd9, // RETI
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.interrupts_enabled = false;
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x08);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc100);
+    assert_eq!(core.registers.get_ip(), 0x06);
+    assert!(core.interrupts_enabled);
+  }
+  
+  #[test]
+  fn stop() {
+    let code = vec![
+      0x10, 0x00, // STOP
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.run_state, RunState::Stop);
+  }
+
+  #[test]
+  fn halt() {
+    let code = vec![
+      0x76, // HALT
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.run_state, RunState::Halt);
   }
 }

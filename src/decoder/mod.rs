@@ -408,6 +408,8 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     },
     0xf1 => (Op::Pop(Register16::AF), 1, 12),
 
+    0xf3 => (Op::InterruptDisable, 1, 4),
+    // f4 invalid
     0xf5 => (Op::Push(Register16::AF), 1, 12),
     0xf6 => {
       let value = instructions[1];
@@ -421,7 +423,9 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       let op = Op::LoadAFromMemory(addr);
       (op, 3, 16)
     },
-
+    0xfb => (Op::InterruptEnable, 1, 4),
+    // fc invalid
+    // fd invalid
     0xfe => {
       let value = instructions[1];
       let op = Op::CompareAbsolute8(value);

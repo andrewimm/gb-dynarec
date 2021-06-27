@@ -62,6 +62,8 @@ pub enum Op {
   Return(JumpCondition),
   ResetVector(u16),
   ReturnFromInterrupt,
+  InterruptEnable,
+  InterruptDisable,
   Push(Register16),
   Pop(Register16),
 }
@@ -76,6 +78,8 @@ impl Op {
       Op::ResetVector(_) => true,
       Op::Return(_) => true,
       Op::ReturnFromInterrupt => true,
+      Op::InterruptEnable => true,
+      Op::InterruptDisable => true,
       _ => false,
     }
   }
