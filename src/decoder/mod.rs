@@ -327,6 +327,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       (op, 2, 8)
     },
     0xcf => (Op::ResetVector(0x08), 1, 16),
+
     0xd0 => (Op::Return(JumpCondition::NoCarry), 1, 8),
     0xd1 => (Op::Pop(Register16::DE), 1, 12),
     0xd2 => {
@@ -367,6 +368,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       (op, 2, 8)
     },
     0xdf => (Op::ResetVector(0x18), 1, 16),
+
     0xe0 => {
       let addr_low = instructions[1] as u16;
       let addr = 0xff00 | addr_low;

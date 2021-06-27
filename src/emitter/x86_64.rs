@@ -106,6 +106,7 @@ impl Emitter {
       Op::JumpRelative(cond, offset) => self.encode_jump_relative(cond, offset, exec),
       Op::Call(cond, address) => self.encode_call(cond, address, exec),
       Op::ResetVector(vector) => self.encode_reset(vector, exec),
+      Op::Return(cond) => self.encode_return(cond, exec),
 
       Op::Invalid(code) => panic!("Invalid OP: {:#04x}", code),
       _ => panic!("unsupported op"),
@@ -559,6 +560,52 @@ impl Emitter {
     let mut len = emit_ip_increment(1, exec);
     len += emit_push(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
     len + emit_jump(vector, &mut exec[len..])
+  }
+
+  pub fn encode_return(&self, condition: JumpCondition, exec: &mut [u8]) -> usize {
+    let mut len;
+    match condition {
+      JumpCondition::Always => {
+        len = emit_pop(X86Reg16::R13, self.mem as usize, exec);
+      },
+      JumpCondition::Zero => {
+        len = emit_ip_increment(1, exec);
+        len += emit_flag_test(0x80, &mut exec[len..]);
+        len += emit_jump_zero(0, &mut exec[len..]);
+        let offset_location = len;
+        len += emit_pop(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
+        let delta = len - offset_location;
+        exec[offset_location - 1] = delta as u8;
+      },
+      JumpCondition::NonZero => {
+        len = emit_ip_increment(1, exec);
+        len += emit_flag_test(0x80, &mut exec[len..]);
+        len += emit_jump_nonzero(0, &mut exec[len..]);
+        let offset_location = len;
+        len += emit_pop(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
+        let delta = len - offset_location;
+        exec[offset_location - 1] = delta as u8;
+      },
+      JumpCondition::Carry => {
+        len = emit_ip_increment(1, exec);
+        len += emit_flag_test(0x10, &mut exec[len..]);
+        len += emit_jump_zero(0, &mut exec[len..]);
+        let offset_location = len;
+        len += emit_pop(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
+        let delta = len - offset_location;
+        exec[offset_location - 1] = delta as u8;
+      },
+      JumpCondition::NoCarry => {
+        len = emit_ip_increment(1, exec);
+        len += emit_flag_test(0x10, &mut exec[len..]);
+        len += emit_jump_nonzero(0, &mut exec[len..]);
+        let offset_location = len;
+        len += emit_pop(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
+        let delta = len - offset_location;
+        exec[offset_location - 1] = delta as u8;
+      },
+    }
+    len
   }
 }
 

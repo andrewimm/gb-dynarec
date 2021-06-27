@@ -1257,4 +1257,60 @@ mod tests {
     assert_eq!(core.memory.work_ram[0xff], 0x00);
     assert_eq!(core.memory.work_ram[0xfe], 0x04);
   }
+
+  #[test]
+  fn ret() {
+    let code = vec![
+      0x31, 0x00, 0xc1, // LD SP, 0xc100
+      0xcd, 0x10, 0x00, // CALL 0x0010
+      0xcd, 0x11, 0x00, // CALL 0x0011
+      0xcd, 0x13, 0x00, // CALL 0x0013
+      0xc3, 0x15, 0x00, // JP 0x0015
+      0x00,
+      0xc9, // RET
+      0xc8, // RET Z
+      0xc0, // RET NZ
+      0xd8, // RET C
+      0xd0, // RET NC
+      0xa7, // AND A
+      0xcd, 0x11, 0x00, // CALL 0x0011
+      0xc6, 0xff, // ADD A, 0xff
+      0xc6, 0x01, // ADD A, 0x01
+      0xcd, 0x12, 0x00, // CALL 0x0012
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x10);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x06);
+    assert_eq!(core.registers.get_sp(), 0xc100);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x11);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x12);
+    assert_eq!(core.registers.get_sp(), 0xc0fe);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x09);
+    assert_eq!(core.registers.get_sp(), 0xc100);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x13);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x14);
+    assert_eq!(core.registers.get_sp(), 0xc0fe);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x0c);
+    assert_eq!(core.registers.get_sp(), 0xc100);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x15);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x11);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x19);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x12);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x13);
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x20);
+  }
 }
