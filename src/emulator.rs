@@ -925,6 +925,90 @@ mod tests {
     core.run_code_block();
     assert_eq!(core.registers.get_af(), 0x0010);
   }
+  
+  #[test]
+  fn daa() {
+    { // test no correction case
+      let code = vec![
+        0xc6, 0x32, // ADD A, 0x32
+        0xc6, 0x05, // ADD A, 0x05
+        0x27, // DAA
+      ];
+      let mut core = Core::with_code_block(code.into_boxed_slice());
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0x3700);
+    }
+    { // test lower digit BCD overflow
+      let code = vec![
+        0xc6, 0x36, // ADD A, 0x36
+        0xc6, 0x05, // ADD A, 0x05
+        0x27, // DAA
+      ];
+      let mut core = Core::with_code_block(code.into_boxed_slice());
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0x4120);
+    }
+    { // test higher digit BCD overflow
+      let code = vec![
+        0xc6, 0x76, // ADD A, 0x76
+        0xc6, 0x50, // ADD A, 0x50
+        0x27, // DAA
+      ];
+      let mut core = Core::with_code_block(code.into_boxed_slice());
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0x2610);
+    }
+    { // lower digit correct causes carry
+      let code = vec![
+        0xc6, 0x86, // ADD A, 0x86
+        0xc6, 0x76, // ADD A, 0x76
+        0x27, // DAA
+      ];
+      let mut core = Core::with_code_block(code.into_boxed_slice());
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0x6230);
+    }
+    { // test both digits BCD overflow
+      let code = vec![
+        0xc6, 0x36, // ADD A, 0x36
+        0xc6, 0x88, // ADD A, 0x88
+        0x27, // DAA
+      ];
+      let mut core = Core::with_code_block(code.into_boxed_slice());
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0x2430);
+    }
+    { // test lower digit half-carry
+      let code = vec![
+        0xc6, 0x39, // ADD A, 0x39
+        0xc6, 0x19, // ADD A, 0x19
+        0x27, // DAA
+      ];
+      let mut core = Core::with_code_block(code.into_boxed_slice());
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0x5820);
+    }
+    { // test higher digit carry
+      let code = vec![
+        0xc6, 0x91, // ADD A, 0x91
+        0xc6, 0x93, // ADD A, 0x93
+        0x27, // DAA
+      ];
+      let mut core = Core::with_code_block(code.into_boxed_slice());
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0x8410);
+    }
+    { // overflow all digits
+      let code = vec![
+        0xc6, 0x99, // ADD A, 0x99
+        0xc6, 0x99, // ADD A, 0x99
+        0x27, // DAA
+      ];
+      let mut core = Core::with_code_block(code.into_boxed_slice());
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0x9830);
+    }
+  }
 
   #[test]
   fn load_to_indirect() {

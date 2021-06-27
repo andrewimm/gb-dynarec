@@ -108,6 +108,7 @@ impl Emitter {
       Op::LoadAFromMemory(addr) => self.encode_load_a_from_memory(addr, ip_increment, exec),
       Op::Push(reg) => self.encode_push(reg, ip_increment, exec),
       Op::Pop(reg) => self.encode_pop(reg, ip_increment, exec),
+      Op::DAA => self.encode_daa(ip_increment, exec),
 
       Op::Jump(cond, address) => self.encode_jump(cond, address, exec),
       Op::JumpRelative(cond, offset) => self.encode_jump_relative(cond, offset, exec),
@@ -453,6 +454,11 @@ impl Emitter {
   pub fn encode_pop(&self, reg: Register16, ip_increment: usize, exec: &mut [u8]) -> usize {
     let dest = map_register_16(reg);
     let len = emit_pop(dest, self.mem as usize, exec);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_daa(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let len = emit_daa(exec);
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
@@ -1082,6 +1088,51 @@ fn emit_register_and(reg: X86Reg8, mask: u8, exec: &mut [u8]) -> usize {
   };
   exec[2] = mask;
   3
+}
+
+/// The infamous DAA, used to adjust BCD math
+fn emit_daa(exec: &mut [u8]) -> usize {
+  let code = [
+    0x66, 0x50, // push ax
+    0x89, 0xc6, // mov esi, eax
+    0x81, 0xe6, 0x00, 0x0f, 0x00, 0x00, // and esi, 0x0f00
+    0x81, 0xfe, 0x00, 0x09, 0x00, 0x00, // cmp esi, 0x0900
+    0x7f, 0x0e, // jg fix_low
+    0x89, 0xc6, // mov esi, eax
+    0x83, 0xe6, 0x20, // and esi, 0x20
+    0x75, 0x07, // jne fix_low
+    0x25, 0xd0, 0xff, 0x00, 0x00, // and eax, 0xffd0
+    0xeb, 0x13, // jmp daa_continue
+
+    // fix_low:
+    0x05, 0x00, 0x06, 0x00, 0x00, // and eax, 0x0600
+    0x9c, // pushfq
+    0x5e, // pop rsi
+    0x48, 0x83, 0xe6, 0x01, // and rsi, 1
+    0xc1, 0xe6, 0x04, // shl esi, 4
+    0x09, 0xf0, // or eax, esi
+    0x83, 0xc8, 0x20, // or eax, 0x20
+
+    // daa_continue:
+    0x66, 0x5e, // pop si
+    0x0f, 0xba, 0xe6, 0x04, // bt esi, 4
+    0x72, 0x15, // jc fix_high
+    0x81, 0xe6, 0x00, 0xff, 0x00, 0x00, // and esi, 0xff00
+    0x81, 0xfe, 0x00, 0x99, 0x00, 0x00, // cmp esi, 0x9900
+    0x7f, 0x07, // jg fix_high
+    0x25, 0xe0, 0xff, 0x00, 0x00, // and eax, 0xffe0
+    0xeb, 0x0d, // jmp done
+
+    // fix_high:
+    0x05, 0x00, 0x60, 0x00, 0x00, // add eax, 0x6000
+    0x25, 0xff, 0xff, 0x00, 0x00, // and eax, 0xffff
+    0x83, 0xc8, 0x10, // or eax, 0x10
+
+    // done:
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
 }
 
 fn emit_memory_read(exec: &mut [u8], memory_base: usize, indirect_address: X86Reg16, dest_register: X86Reg8) -> usize {
