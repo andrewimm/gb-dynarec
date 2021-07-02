@@ -1154,7 +1154,7 @@ mod tests {
       ];
       let mut core = Core::with_code_block(code.into_boxed_slice());
       core.run_code_block();
-      assert_eq!(core.registers.get_af(), 0x4120);
+      assert_eq!(core.registers.get_af(), 0x4100);
     }
     { // test higher digit BCD overflow
       let code = vec![
@@ -1174,7 +1174,7 @@ mod tests {
       ];
       let mut core = Core::with_code_block(code.into_boxed_slice());
       core.run_code_block();
-      assert_eq!(core.registers.get_af(), 0x6230);
+      assert_eq!(core.registers.get_af(), 0x6210);
     }
     { // test both digits BCD overflow
       let code = vec![
@@ -1184,7 +1184,7 @@ mod tests {
       ];
       let mut core = Core::with_code_block(code.into_boxed_slice());
       core.run_code_block();
-      assert_eq!(core.registers.get_af(), 0x2430);
+      assert_eq!(core.registers.get_af(), 0x2410);
     }
     { // test lower digit half-carry
       let code = vec![
@@ -1194,7 +1194,7 @@ mod tests {
       ];
       let mut core = Core::with_code_block(code.into_boxed_slice());
       core.run_code_block();
-      assert_eq!(core.registers.get_af(), 0x5820);
+      assert_eq!(core.registers.get_af(), 0x5800);
     }
     { // test higher digit carry
       let code = vec![
@@ -1214,7 +1214,37 @@ mod tests {
       ];
       let mut core = Core::with_code_block(code.into_boxed_slice());
       core.run_code_block();
-      assert_eq!(core.registers.get_af(), 0x9830);
+      assert_eq!(core.registers.get_af(), 0x9810);
+    }
+    { // subtract, adjust lower digit
+      let code = vec![
+        0xc6, 0x10, // ADD A, 0x10
+        0xd6, 0x02, // SUB 0x02
+        0x27, // DAA
+      ];
+      let mut core = Core::with_code_block(code.into_boxed_slice());
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0x0840);
+    }
+    { // subtract, adjust higher digit
+      let code = vec![
+        0xc6, 0x10, // ADD A, 0x10
+        0xd6, 0x20, // SUB 0x20
+        0x27, // DAA
+      ];
+      let mut core = Core::with_code_block(code.into_boxed_slice());
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0x9050);
+    }
+    {// add, adjust to zero
+      let code = vec![
+        0xc6, 0x85, // ADD A, 0x85
+        0xc6, 0x15, // ADD A, 0x15
+        0x27, // DAA
+      ];
+      let mut core = Core::with_code_block(code.into_boxed_slice());
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0x0090);
     }
   }
 
