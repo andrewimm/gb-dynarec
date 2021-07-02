@@ -447,6 +447,24 @@ mod tests {
   }
 
   #[test]
+  fn add_8() {
+    let code = vec![
+      0xc6, 0x0f, // ADD A, 0x0f
+      0xc3, 0x05, 0x00, // JP 0x0005
+      0xc6, 0x23, // ADD A, 0x23
+      0xc3, 0x0a, 0x00, // JP 0x000a
+      0xc6, 0xf0, // ADD A, 0xf0
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0f00);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x3220);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x2210);
+  }
+
+  #[test]
   fn adc_a() {
     let code = vec![
       0x3e, 0x60, // LD A, 0x60
@@ -504,6 +522,163 @@ mod tests {
     core.run_code_block();
     assert_eq!(core.registers.get_af(), 0x1020);
     assert_eq!(core.registers.get_de(), 0x00fc);
+  }
+
+  #[test]
+  fn adc_8() {
+    let code = vec![
+      0xce, 0x14, // ADC A, 0x14
+      0xc3, 0x05, 0x00, // JP 0x0005
+      0xce, 0xf1, // ADC A, 0xf1
+      0xc3, 0x0a, 0x00, // JP 0x000a
+      0xce, 0x30, // ADC A, 0x30
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x1400);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0510);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x3600);
+  }
+
+  #[test]
+  fn sub_a() {
+    let code = vec![
+      0x3e, 0x48, // LD A, 0x48
+      0x06, 0x07, // LD B, 0x07
+      0x90, // SUB B
+      0xc3, 0x08, 0x00, // JP 0x0008
+      0x0e, 0x04, // LD C, 0x04
+      0x91, // SUB C
+      0xc3, 0x0e, 0x00, // JP 0x000e
+      0x16, 0x3d, // LD D, 0x3d
+      0x92, // SUB D
+      0xc3, 0x14, 0x00, // JP 0x0014
+      0x1e, 0x05, // LD E, 0x05
+      0x93, // SUB E
+      0xc3, 0x1a, 0x00, // JP 0x001a
+      0x26, 0x4c, // LD H, 0x4c
+      0x94, // SUB H
+      0xc3, 0x20, 0x00, // JP 0x0020
+      0x2e, 0x10, // LD L, 0x10
+      0x95, // SUB L
+      0xc3, 0x26, 0x00, // JP 0x0026
+      0x97, // SUB A
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x4140);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x3d60);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x00c0);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xfb70);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xaf60);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x9f40);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x00c0);
+  }
+
+  #[test]
+  fn sub_indirect() {
+    let code = vec![
+      0x3e, 0x12, // LD A, 0x12
+      0x1e, 0xfc, // LD E, 0xfc
+      0xea, 0x3e, 0xc0, // LD (0xc03e), A
+      0x26, 0xc0, // LD H, 0xc0
+      0x2e, 0x3e, // LD L, 0x3e
+      0x3e, 0x38, // LD A, 0x38
+      0x96, // SUB A, (HL)
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x2640);
+    assert_eq!(core.registers.get_de(), 0x00fc);
+  }
+
+  #[test]
+  fn sub_8() {
+    let code = vec![
+      0x3e, 0x4e, // LD A, 0x4e
+      0xd6, 0x1f, // SUB 0x1f
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x2f60);
+  }
+
+  #[test]
+  fn sbc_a() {
+    let code = vec![
+      0x3e, 0x05, // LD A, 0x05
+      0x06, 0x07, // LD B, 0x07
+      0x98, // SBC B
+      0xc3, 0x08, 0x00, // JP 0x0008
+      0x0e, 0x04, // LD C, 0x04
+      0x99, // SBC C
+      0xc3, 0x0e, 0x00, // JP 0x000e
+      0x16, 0x59, // LD D, 0x59
+      0x9a, // SBC D
+      0xc3, 0x14, 0x00, // JP 0x0014
+      0x1e, 0x21, // LD E, 0x21
+      0x9b, // SBC E
+      0xc3, 0x1a, 0x00, // JP 0x001a
+      0x26, 0x70, // LD H, 0x70
+      0x9c, // SBC H
+      0xc3, 0x20, 0x00, // JP 0x0020
+      0x2e, 0x10, // LD L, 0x10
+      0x9d, // SBC L
+      0xc3, 0x26, 0x00, // JP 0x0026
+      0x9f, // SBC A
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xfe70);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xf940);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xa040);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x7f60);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0f40);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xff50);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xff70);
+  }
+
+  #[test]
+  fn sbc_indirect() {
+    let code = vec![
+      0x3e, 0x14, // LD A, 0x14
+      0x1e, 0xfc, // LD E, 0xfc
+      0xea, 0x02, 0xc0, // LD (0xc002), A
+      0x26, 0xc0, // LD H, 0xc0
+      0x2e, 0x02, // LD L, 0x3e
+      0x3e, 0x1f, // LD A, 0x1f
+      0x9e, // SBC A, (HL)
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.registers.af = 0x0010;
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0a40);
+    assert_eq!(core.registers.get_de(), 0x00fc);
+  }
+
+  #[test]
+  fn sub_immediate() {
+    let code = vec![
+      0x3e, 0xf1, // LD A, 0xf1
+      0xd6, 0x14, // SUB 0x14
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xdd60);
   }
 
   #[test]
@@ -565,6 +740,17 @@ mod tests {
   }
 
   #[test]
+  fn and_8() {
+    let code = vec![
+      0x3e, 0x7c, // LD A, 0x7c
+      0xe6, 0x35, // AND 0x35
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x3420);
+  }
+
+  #[test]
   fn xor_a() {
     let code = vec![
       0x3e, 0x0f, // LD A, 0x0f
@@ -623,6 +809,17 @@ mod tests {
   }
 
   #[test]
+  fn xor_8() {
+    let code = vec![
+      0x3e, 0xf0, // LD A, 0xf0
+      0xee, 0xf0, // XOR 0xf0
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0080);
+  }
+
+  #[test]
   fn or_a() {
     let code = vec![
       0x3e, 0x00, // LD A, 0x00
@@ -678,6 +875,17 @@ mod tests {
     core.run_code_block();
     assert_eq!(core.registers.get_af(), 0xcb00);
     assert_eq!(core.registers.get_de(), 0x00fc);
+  }
+
+  #[test]
+  fn or_8() {
+    let code = vec![
+      0x3e, 0x73, // LD A, 0x73
+      0xf6, 0xf1, // OR 0xf1
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0xf300);
   }
 
   #[test]

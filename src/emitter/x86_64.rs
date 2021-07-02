@@ -79,15 +79,23 @@ impl Emitter {
       Op::AddWithCarry8(dest, src) => self.encode_add_register_8_with_carry(dest, src, ip_increment, exec),
       Op::AddHL(src) => self.encode_add_hl(src, ip_increment, exec),
       Op::AddAbsolute8(value) => self.encode_add_absolute_8(value, ip_increment, exec),
+      Op::AddAbsoluteWithCarry8(value) => self.encode_adc_absolute_8(value, ip_increment, exec),
       Op::AddIndirect => self.encode_add_indirect(ip_increment, exec),
       Op::AddIndirectWithCarry => self.encode_add_indirect_with_carry(ip_increment, exec),
       Op::Sub8(dest, src) => self.encode_sub_register_8(dest, src, ip_increment, exec),
       Op::SubWithCarry8(dest, src) => self.encode_sub_register_8_with_carry(dest, src, ip_increment, exec),
+      Op::SubAbsolute8(value) => self.encode_sub_absolute_8(value, ip_increment, exec),
+      Op::SubAbsoluteWithCarry8(value) => self.encode_sbc_absolute_8(value, ip_increment, exec),
+      Op::SubIndirect => self.encode_sub_indirect(ip_increment, exec),
+      Op::SubIndirectWithCarry => self.encode_sub_indirect_with_carry(ip_increment, exec),
       Op::And8(dest, src) => self.encode_and_register_8(dest, src, ip_increment, exec),
+      Op::AndAbsolute8(value) => self.encode_and_absolute_8(value, ip_increment, exec),
       Op::AndIndirect => self.encode_and_indirect(ip_increment, exec),
       Op::Xor8(dest, src) => self.encode_xor_register_8(dest, src, ip_increment, exec),
+      Op::XorAbsolute8(value) => self.encode_xor_absolute_8(value, ip_increment, exec),
       Op::XorIndirect => self.encode_xor_indirect(ip_increment, exec),
       Op::Or8(dest, src) => self.encode_or_register_8(dest, src, ip_increment, exec),
+      Op::OrAbsolute8(value) => self.encode_or_absolute_8(value, ip_increment, exec),
       Op::OrIndirect => self.encode_or_indirect(ip_increment, exec),
       Op::RotateLeftA => self.encode_rotate_left_a(ip_increment, exec),
       Op::RotateLeftCarryA => self.encode_rotate_left_carry_a(ip_increment, exec),
@@ -237,11 +245,35 @@ impl Emitter {
   }
 
   pub fn encode_sub_register_8(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
-    0
+    let mut len = emit_sub_register_8(map_register_8(dest), map_register_8(src), exec);
+    len += emit_store_flags(0xf0, true, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
   pub fn encode_sub_register_8_with_carry(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
-    0
+    let mut len = emit_restore_carry(exec);
+    len += emit_sub_register_8_with_carry(map_register_8(dest), map_register_8(src), &mut exec[len..]);
+    len += emit_store_flags(0xf0, true, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_sub_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_push_register(X86Reg64::RDX, exec);
+    len += emit_hl_indirect_read(self.mem as usize, &mut exec[len..]);
+    len += emit_sub_register_8(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0xf0, true, &mut exec[len..]);
+    len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_sub_indirect_with_carry(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_push_register(X86Reg64::RDX, exec);
+    len += emit_hl_indirect_read(self.mem as usize, &mut exec[len..]);
+    len += emit_restore_carry(&mut exec[len..]);
+    len += emit_sub_register_8_with_carry(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0xf0, true, &mut exec[len..]);
+    len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
   pub fn encode_and_register_8(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -300,6 +332,47 @@ impl Emitter {
   pub fn encode_add_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_add_absolute_8(value, exec);
     len += emit_store_flags(0xf0, false, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_adc_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_restore_carry(exec);
+    len += emit_adc_absolute_8(value, &mut exec[len..]);
+    len += emit_store_flags(0xf0, false, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_sub_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_sub_absolute_8(value, exec);
+    len += emit_store_flags(0xf0, true, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_sbc_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_sbc_absolute_8(value, exec);
+    len += emit_store_flags(0xf0, true, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_and_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_and_absolute_8(value, exec);
+    len += emit_store_flags(0xc0, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x10, &mut exec[len..]);
+    len += emit_force_flags_on(0x20, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_or_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_or_absolute_8(value, exec);
+    len += emit_store_flags(0x80, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x70, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_xor_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_xor_absolute_8(value, exec);
+    len += emit_store_flags(0x80, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x70, &mut exec[len..]);
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
@@ -724,6 +797,18 @@ fn emit_add_register_8_with_carry(dest: X86Reg8, src: X86Reg8, exec: &mut [u8]) 
   2
 }
 
+fn emit_sub_register_8(dest: X86Reg8, src: X86Reg8, exec: &mut [u8]) -> usize {
+  exec[0] = 0x28;
+  exec[1] = register_to_register(src, dest);
+  2
+}
+
+fn emit_sub_register_8_with_carry(dest: X86Reg8, src: X86Reg8, exec: &mut [u8]) -> usize {
+  exec[0] = 0x18;
+  exec[1] = register_to_register(src, dest);
+  2
+}
+
 fn emit_and_register_8(dest: X86Reg8, src: X86Reg8, exec: &mut [u8]) -> usize {
   exec[0] = 0x20;
   exec[1] = register_to_register(src, dest);
@@ -790,6 +875,48 @@ fn emit_add_hl(src: X86Reg16, exec: &mut [u8]) -> usize {
 fn emit_add_absolute_8(value: u8, exec: &mut [u8]) -> usize {
   exec[0] = 0x80;
   exec[1] = 0xc4;
+  exec[2] = value;
+  3
+}
+
+fn emit_adc_absolute_8(value: u8, exec: &mut [u8]) -> usize {
+  exec[0] = 0x80;
+  exec[1] = 0xd4;
+  exec[2] = value;
+  3
+}
+
+fn emit_sub_absolute_8(value: u8, exec: &mut [u8]) -> usize {
+  exec[0] = 0x80;
+  exec[1] = 0xec;
+  exec[2] = value;
+  3
+}
+
+fn emit_sbc_absolute_8(value: u8, exec: &mut [u8]) -> usize {
+  exec[0] = 0x80;
+  exec[1] = 0xdc;
+  exec[2] = value;
+  3
+}
+
+fn emit_and_absolute_8(value: u8, exec: &mut [u8]) -> usize {
+  exec[0] = 0x80;
+  exec[1] = 0xe4;
+  exec[2] = value;
+  3
+}
+
+fn emit_xor_absolute_8(value: u8, exec: &mut [u8]) -> usize {
+  exec[0] = 0x80;
+  exec[1] = 0xf4;
+  exec[2] = value;
+  3
+}
+
+fn emit_or_absolute_8(value: u8, exec: &mut [u8]) -> usize {
+  exec[0] = 0x80;
+  exec[1] = 0xcc;
   exec[2] = value;
   3
 }

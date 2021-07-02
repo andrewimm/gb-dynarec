@@ -234,7 +234,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0x93 => (Op::Sub8(Register8::A, Register8::E), 1, 4),
     0x94 => (Op::Sub8(Register8::A, Register8::H), 1, 4),
     0x95 => (Op::Sub8(Register8::A, Register8::L), 1, 4),
-
+    0x96 => (Op::SubIndirect, 1, 8),
     0x97 => (Op::Sub8(Register8::A, Register8::A), 1, 4),
     0x98 => (Op::SubWithCarry8(Register8::A, Register8::B), 1, 4),
     0x99 => (Op::SubWithCarry8(Register8::A, Register8::C), 1, 4),
@@ -242,7 +242,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0x9b => (Op::SubWithCarry8(Register8::A, Register8::E), 1, 4),
     0x9c => (Op::SubWithCarry8(Register8::A, Register8::H), 1, 4),
     0x9d => (Op::SubWithCarry8(Register8::A, Register8::L), 1, 4),
-
+    0x9e => (Op::SubIndirectWithCarry, 1, 8),
     0x9f => (Op::SubWithCarry8(Register8::A, Register8::A), 1, 4),
 
     0xa0 => (Op::And8(Register8::A, Register8::B), 1, 4),
@@ -276,7 +276,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0xbb => (Op::Compare8(Register8::A, Register8::E), 1, 4),
     0xbc => (Op::Compare8(Register8::A, Register8::H), 1, 4),
     0xbd => (Op::Compare8(Register8::A, Register8::L), 1, 4),
-
+    0xbe => (Op::CompareIndirect, 1, 8),
     0xbf => (Op::Compare8(Register8::A, Register8::A), 1, 4),
 
     0xc0 => (Op::Return(JumpCondition::NonZero), 1, 8),
@@ -377,6 +377,8 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     },
     0xe1 => (Op::Pop(Register16::HL), 1, 12),
     
+    // e3 invalid
+    // e4 invalid
     0xe5 => (Op::Push(Register16::HL), 1, 12),
     0xe6 => {
       let value = instructions[1];
@@ -384,7 +386,12 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       (op, 2, 8)
     },
     0xe7 => (Op::ResetVector(0x20), 1, 16),
-
+    0xe8 => {
+      let offset = instructions[1] as i8;
+      let op = Op::AddSP(offset);
+      (op, 2, 16)
+    },
+    0xe9 => (Op::JumpHL, 1, 4),
     0xea => {
       let addr = read_u16(&instructions[1..]);
       let op = Op::LoadAToMemory(addr);
