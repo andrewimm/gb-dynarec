@@ -97,6 +97,9 @@ impl Emitter {
       Op::Or8(dest, src) => self.encode_or_register_8(dest, src, ip_increment, exec),
       Op::OrAbsolute8(value) => self.encode_or_absolute_8(value, ip_increment, exec),
       Op::OrIndirect => self.encode_or_indirect(ip_increment, exec),
+      Op::Compare8(reg) => self.encode_compare(reg, ip_increment, exec),
+      Op::CompareIndirect => self.encode_compare_indirect(ip_increment, exec),
+      Op::CompareAbsolute8(value) => self.encode_cmp_absolute_8(value, ip_increment, exec),
       Op::RotateLeftA => self.encode_rotate_left_a(ip_increment, exec),
       Op::RotateLeftCarryA => self.encode_rotate_left_carry_a(ip_increment, exec),
       Op::RotateLeft(reg) => self.encode_rotate_left(reg, ip_increment, exec),
@@ -329,6 +332,21 @@ impl Emitter {
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
+  pub fn encode_compare(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_compare(map_register_8(reg), exec);
+    len += emit_store_flags(0xf0, true, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_compare_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_push_register(X86Reg64::RDX, exec);
+    len += emit_hl_indirect_read(self.mem as usize, &mut exec[len..]);
+    len += emit_compare(X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0xf0, true, &mut exec[len..]);
+    len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
   pub fn encode_add_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_add_absolute_8(value, exec);
     len += emit_store_flags(0xf0, false, &mut exec[len..]);
@@ -373,6 +391,12 @@ impl Emitter {
     let mut len = emit_xor_absolute_8(value, exec);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
     len += emit_force_flags_off(0x70, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_cmp_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_cmp_absolute_8(value, exec);
+    len += emit_store_flags(0xf0, true, &mut exec[len..]);
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
@@ -917,6 +941,19 @@ fn emit_xor_absolute_8(value: u8, exec: &mut [u8]) -> usize {
 fn emit_or_absolute_8(value: u8, exec: &mut [u8]) -> usize {
   exec[0] = 0x80;
   exec[1] = 0xcc;
+  exec[2] = value;
+  3
+}
+
+fn emit_compare(other: X86Reg8, exec: &mut [u8]) -> usize {
+  exec[0] = 0x38;
+  exec[1] = register_to_register(other, X86Reg8::AH);
+  2
+}
+
+fn emit_cmp_absolute_8(value: u8, exec: &mut [u8]) -> usize {
+  exec[0] = 0x80;
+  exec[1] = 0xfc;
   exec[2] = value;
   3
 }

@@ -36,7 +36,7 @@ pub enum Op {
   Xor8(Register8, Register8),
   XorAbsolute8(u8),
   XorIndirect,
-  Compare8(Register8, Register8),
+  Compare8(Register8),
   CompareAbsolute8(u8),
   CompareIndirect,
   RotateLeftCarryA,

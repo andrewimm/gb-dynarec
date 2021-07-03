@@ -889,6 +889,66 @@ mod tests {
   }
 
   #[test]
+  fn cmp() {
+    let code = vec![
+      0x3e, 0x16, // LD A, 0x16
+      0x06, 0x04, // LD B, 0x04
+      0xb8, // CP B
+      0xc3, 0x08, 0x00, // JP 0x0008
+      0x0e, 0x08, // LD C, 0x08
+      0xb9, // CP C
+      0xc3, 0x0e, 0x00, // JP 0x000e
+      0x16, 0x16, // LD D, 0x16
+      0xba, // CP D
+      0xc3, 0x14, 0x00, // JP 0x0014
+      0x1e, 0x20, // LD E, 0x20
+      0xbb, // CP E
+      0xc3, 0x1a, 0x00, // JP 0x001a
+      0x26, 0x28, // LD H, 0x28,
+      0xbc, // CP H
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x1640);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x1660);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x16c0);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x1650);
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x1670);
+  }
+
+  #[test]
+  fn cmp_indirect() {
+    let code = vec![
+      0x3e, 0x50, // LD A, 0x50
+      0x1e, 0xfc, // LD E, 0xfc
+      0xea, 0x00, 0xc0, // LD (0xc000), A
+      0x26, 0xc0, // LD H, 0xc0
+      0x2e, 0x00, // LD L, 0x00
+      0x3e, 0x34, // LD A, 0x34
+      0xbe, // CP A, (HL)
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x3450);
+    assert_eq!(core.registers.get_de(), 0x00fc);
+  }
+
+  #[test]
+  fn cmp_8() {
+    let code = vec![
+      0x3e, 0x44, // LD A, 0x44
+      0xfe, 0x44, // CP A, 0x44
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x44c0);
+  }
+
+  #[test]
   fn rla() {
     let code = vec![
       0x3e, 0x0e, // MOV A, 0x0e
