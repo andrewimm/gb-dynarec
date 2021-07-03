@@ -117,8 +117,13 @@ impl Emitter {
       Op::LoadStackPointerToMemory(addr) => self.encode_load_stack_to_memory(addr, ip_increment, exec),
       Op::LoadAToMemory(addr) => self.encode_load_a_to_memory(addr, ip_increment, exec),
       Op::LoadAFromMemory(addr) => self.encode_load_a_from_memory(addr, ip_increment, exec),
+      Op::LoadToHighMem => self.encode_load_to_high_mem(ip_increment, exec),
+      Op::LoadFromHighMem => self.encode_load_from_high_mem(ip_increment, exec),
       Op::Push(reg) => self.encode_push(reg, ip_increment, exec),
       Op::Pop(reg) => self.encode_pop(reg, ip_increment, exec),
+      Op::AddSP(offset) => self.encode_add_sp(offset, ip_increment, exec),
+      Op::LoadToStackPointer => self.encode_load_to_sp(ip_increment, exec),
+      Op::LoadStackOffset(offset) => self.encode_load_stack_offset(offset, ip_increment, exec),
       Op::DAA => self.encode_daa(ip_increment, exec),
 
       Op::Jump(cond, address) => self.encode_jump(cond, address, exec),
@@ -542,6 +547,16 @@ impl Emitter {
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
+  pub fn encode_load_to_high_mem(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let len = emit_load_to_high_mem(exec, self.mem as usize);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_load_from_high_mem(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let len = emit_load_from_high_mem(exec, self.mem as usize);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
   pub fn encode_push(&self, reg: Register16, ip_increment: usize, exec: &mut [u8]) -> usize {
     let source = map_register_16(reg);
     let len = emit_push(source, self.mem as usize, exec);
@@ -551,6 +566,25 @@ impl Emitter {
   pub fn encode_pop(&self, reg: Register16, ip_increment: usize, exec: &mut [u8]) -> usize {
     let dest = map_register_16(reg);
     let len = emit_pop(dest, self.mem as usize, exec);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_add_sp(&self, offset: i8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_sp_signed_offset(offset, exec);
+    len += emit_store_flags(0x70, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x80, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_load_to_sp(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let len = emit_load_to_sp(exec);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_load_stack_offset(&self, offset: i8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_load_stack_offset(offset, exec);
+    len += emit_store_flags(0x70, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x80, &mut exec[len..]);
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
@@ -1222,6 +1256,15 @@ fn emit_ip_signed_offset(offset: i8, exec: &mut [u8]) -> usize {
   5
 }
 
+fn emit_sp_signed_offset(offset: i8, exec: &mut [u8]) -> usize {
+  exec[0] = 0x66; // add r12w, offset
+  exec[1] = 0x41;
+  exec[2] = 0x83;
+  exec[3] = 0xc4;
+  exec[4] = offset as u8;
+  5
+}
+
 fn emit_register_or(reg: X86Reg8, mask: u8, exec: &mut [u8]) -> usize {
   exec[0] = 0x80;
   exec[1] = match reg {
@@ -1304,6 +1347,24 @@ fn emit_daa(exec: &mut [u8]) -> usize {
     0x08, 0xe4, // or ah, ah
     0x75, 0x02, // jnz +2
     0x0c, 0x80, // or al, 0x80
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
+}
+
+fn emit_load_to_sp(exec: &mut [u8]) -> usize {
+  exec[0] = 0x66; // mov r12w, cx
+  exec[1] = 0x41;
+  exec[2] = 0x89;
+  exec[3] = 0xcc;
+  4
+}
+
+fn emit_load_stack_offset(offset: i8, exec: &mut [u8]) -> usize {
+  let code = [
+    0x66, 0x44, 0x89, 0xe1, // mov r12w, cx
+    0x66, 0x83, 0xc1, offset as u8, // add cx, offset
   ];
   let length = code.len();
   exec[..length].copy_from_slice(&code);
@@ -1543,6 +1604,84 @@ fn emit_read_a_from_memory(exec: &mut [u8], memory_base: usize, address: u16) ->
     0x51, // push rcx
     0x52, // push rdx
     0x66, 0xbe, (address & 0xff) as u8, (address >> 8) as u8, // mov si, address
+    0x48, 0xbf, // movabs rdi, memory_pointer
+      memory_pointer[0],
+      memory_pointer[1],
+      memory_pointer[2],
+      memory_pointer[3],
+      memory_pointer[4],
+      memory_pointer[5],
+      memory_pointer[6],
+      memory_pointer[7],
+
+    0x48, 0xb8, // movabs rax, fn_pointer
+      fn_pointer[0],
+      fn_pointer[1],
+      fn_pointer[2],
+      fn_pointer[3],
+      fn_pointer[4],
+      fn_pointer[5],
+      fn_pointer[6],
+      fn_pointer[7],
+    0xff, 0xd0, // call rax
+    0x88, 0x44, 0x24, 0x11, // mov [rsp + 17], al
+    0x5a, // pop rdx
+    0x59, // pop rcx
+    0x58, // pop rax
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
+}
+
+fn emit_load_to_high_mem(exec: &mut [u8], memory_base: usize) -> usize {
+  let fn_pointer = address_as_bytes(crate::mem::memory_write_byte as u64);
+  let memory_pointer = address_as_bytes(memory_base as u64);
+  let code = [
+    0x50, // push rax
+    0x51, // push rcx
+    0x52, // push rdx
+    0x66, 0x89, 0xde, // mov si, bx
+    0x66, 0x81, 0xce, 0x00, 0xff, // or si, 0xff00
+    0x48, 0xbf, // movabs rdi, memory_pointer
+      memory_pointer[0],
+      memory_pointer[1],
+      memory_pointer[2],
+      memory_pointer[3],
+      memory_pointer[4],
+      memory_pointer[5],
+      memory_pointer[6],
+      memory_pointer[7],
+    0x88, 0xe2, // mov dl, ah
+
+    0x48, 0xb8, // movabs rax, fn_pointer
+      fn_pointer[0],
+      fn_pointer[1],
+      fn_pointer[2],
+      fn_pointer[3],
+      fn_pointer[4],
+      fn_pointer[5],
+      fn_pointer[6],
+      fn_pointer[7],
+    0xff, 0xd0, // call rax
+    0x5a, // pop rdx
+    0x59, // pop rcx
+    0x58, // pop rax
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
+}
+
+fn emit_load_from_high_mem(exec: &mut [u8], memory_base: usize) -> usize {
+  let fn_pointer = address_as_bytes(crate::mem::memory_read_byte as u64);
+  let memory_pointer = address_as_bytes(memory_base as u64);
+  let code = [
+    0x50, // push rax
+    0x51, // push rcx
+    0x52, // push rdx
+    0x66, 0x89, 0xde, // mov si, bx
+    0x66, 0x81, 0xce, 0x00, 0xff, // or si, 0xff00
     0x48, 0xbf, // movabs rdi, memory_pointer
       memory_pointer[0],
       memory_pointer[1],

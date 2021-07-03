@@ -376,7 +376,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       (op, 2, 12)
     },
     0xe1 => (Op::Pop(Register16::HL), 1, 12),
-    
+    0xe2 => (Op::LoadToHighMem, 2, 8),
     // e3 invalid
     // e4 invalid
     0xe5 => (Op::Push(Register16::HL), 1, 12),
@@ -414,7 +414,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       (op, 2, 12)
     },
     0xf1 => (Op::Pop(Register16::AF), 1, 12),
-
+    0xf2 => (Op::LoadFromHighMem, 2, 8),
     0xf3 => (Op::InterruptDisable, 1, 4),
     // f4 invalid
     0xf5 => (Op::Push(Register16::AF), 1, 12),
@@ -424,7 +424,12 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       (op, 2, 8)
     },
     0xf7 => (Op::ResetVector(0x30), 1, 16),
-
+    0xf8 => {
+      let offset = instructions[1] as i8;
+      let op = Op::LoadStackOffset(offset);
+      (op, 2, 12)
+    },
+    0xf9 => (Op::LoadToStackPointer, 1, 8),
     0xfa => {
       let addr = read_u16(&instructions[1..]);
       let op = Op::LoadAFromMemory(addr);

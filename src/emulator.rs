@@ -1309,6 +1309,43 @@ mod tests {
   }
 
   #[test]
+  fn add_sp() {
+    let code = vec![
+      0x31, 0x50, 0xc0, // LD SP, 0xc050
+      0xe8, 0x2c, // ADD SP, 0x2c
+      0xc3, 0x08, 0x00, // JP 0x0008
+      0xe8, 0xff, // ADD SP, 0xff
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc07c);
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0xc07b);
+  }
+
+  #[test]
+  fn load_to_sp() {
+    let code = vec![
+      0x21, 0x43, 0x65, // LD HL, 0x6543
+      0xf9, // LD SP, HL
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_sp(), 0x6543);
+  }
+
+  #[test]
+  fn load_sp_offset() {
+    let code = vec![
+      0x31, 0x14, 0xc0, // LD SP, 0xc014
+      0xf8, 0x23, // LD HL, SP+0x23
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_hl(), 0xc037);
+  }
+
+  #[test]
   fn load_to_indirect() {
     let code = vec![
       0x3e, 0x45, // LD A, 0x45
