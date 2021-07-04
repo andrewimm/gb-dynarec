@@ -108,6 +108,12 @@ impl Emitter {
       Op::RotateRightCarryA => self.encode_rotate_right_carry_a(ip_increment, exec),
       Op::RotateRight(reg) => self.encode_rotate_right(reg, ip_increment, exec),
       Op::RotateRightCarry(reg) => self.encode_rotate_right_carry(reg, ip_increment, exec),
+      Op::ShiftLeft(reg) => self.encode_shift_left(reg, ip_increment, exec),
+      Op::ShiftLeftIndirect => self.encode_shift_left_indirect(ip_increment, exec),
+      Op::ShiftRight(reg) => self.encode_shift_right(reg, ip_increment, exec),
+      Op::ShiftRightIndirect => self.encode_shift_right_indirect(ip_increment, exec),
+      Op::ShiftRightLogical(reg) => self.encode_shift_right_logical(reg, ip_increment, exec),
+      Op::ShiftRightLogicalIndirect => self.encode_shift_right_logical_indirect(ip_increment, exec),
       Op::ComplementA => self.encode_complement_a(ip_increment, exec),
       Op::SetCarryFlag => self.encode_set_carry(ip_increment, exec),
       Op::ComplementCarryFlag => self.encode_complement_carry(ip_increment, exec),
@@ -471,6 +477,54 @@ impl Emitter {
     let mut len = emit_rotate_right(map_register_8(reg), exec);
     len += emit_store_flags(0x10, false, &mut exec[len..]);
     len += emit_force_flags_off(0xe0, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_shift_left(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_shift_left(map_register_8(reg), exec);
+    len += emit_store_flags(0x90, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x60, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_shift_left_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_hl_indirect_partial_read(self.mem as usize, exec);
+    len += emit_shift_left(X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0x90, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x60, &mut exec[len..]);
+    len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_shift_right(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_shift_right(map_register_8(reg), exec);
+    len += emit_store_flags(0x90, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x60, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_shift_right_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_hl_indirect_partial_read(self.mem as usize, exec);
+    len += emit_shift_right(X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0x90, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x60, &mut exec[len..]);
+    len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_shift_right_logical(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_shift_right_logical(map_register_8(reg), exec);
+    len += emit_store_flags(0x90, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x60, &mut exec[len..]);
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_shift_right_logical_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_hl_indirect_partial_read(self.mem as usize, exec);
+    len += emit_shift_right_logical(X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0x90, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x60, &mut exec[len..]);
+    len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
@@ -1170,6 +1224,51 @@ fn emit_rotate_right(register: X86Reg8, exec: &mut [u8]) -> usize {
     X86Reg8::CL => 0xc9,
     X86Reg8::DH => 0xce,
     X86Reg8::DL => 0xca,
+    _ => panic!("Cannot rotate register"),
+  };
+  2
+}
+
+fn emit_shift_left(register: X86Reg8, exec: &mut [u8]) -> usize {
+  exec[0] = 0xd0; // sal register
+  exec[1] = match register {
+    X86Reg8::AH => 0xe4,
+    X86Reg8::BH => 0xe7,
+    X86Reg8::BL => 0xe3,
+    X86Reg8::CH => 0xe5,
+    X86Reg8::CL => 0xe1,
+    X86Reg8::DH => 0xe6,
+    X86Reg8::DL => 0xe2,
+    _ => panic!("Cannot rotate register"),
+  };
+  2
+}
+
+fn emit_shift_right(register: X86Reg8, exec: &mut [u8]) -> usize {
+  exec[0] = 0xd0; // sar register
+  exec[1] = match register {
+    X86Reg8::AH => 0xfc,
+    X86Reg8::BH => 0xff,
+    X86Reg8::BL => 0xfb,
+    X86Reg8::CH => 0xfd,
+    X86Reg8::CL => 0xf9,
+    X86Reg8::DH => 0xfe,
+    X86Reg8::DL => 0xfa,
+    _ => panic!("Cannot rotate register"),
+  };
+  2
+}
+
+fn emit_shift_right_logical(register: X86Reg8, exec: &mut [u8]) -> usize {
+  exec[0] = 0xd0; // shr register
+  exec[1] = match register {
+    X86Reg8::AH => 0xec,
+    X86Reg8::BH => 0xef,
+    X86Reg8::BL => 0xeb,
+    X86Reg8::CH => 0xed,
+    X86Reg8::CL => 0xe9,
+    X86Reg8::DH => 0xee,
+    X86Reg8::DL => 0xea,
     _ => panic!("Cannot rotate register"),
   };
   2

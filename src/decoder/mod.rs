@@ -485,6 +485,23 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
 
     0x1f => (Op::RotateRight(Register8::A), 2, 8),
 
+    0x20 => (Op::ShiftLeft(Register8::B), 2, 8),
+    0x21 => (Op::ShiftLeft(Register8::C), 2, 8),
+    0x22 => (Op::ShiftLeft(Register8::D), 2, 8),
+    0x23 => (Op::ShiftLeft(Register8::E), 2, 8),
+    0x24 => (Op::ShiftLeft(Register8::H), 2, 8),
+    0x25 => (Op::ShiftLeft(Register8::L), 2, 8),
+    0x26 => (Op::ShiftLeftIndirect, 2, 16),
+    0x27 => (Op::ShiftLeft(Register8::A), 2, 8),
+    0x28 => (Op::ShiftRight(Register8::B), 2, 8),
+    0x29 => (Op::ShiftRight(Register8::C), 2, 8),
+    0x2a => (Op::ShiftRight(Register8::D), 2, 8),
+    0x2b => (Op::ShiftRight(Register8::E), 2, 8),
+    0x2c => (Op::ShiftRight(Register8::H), 2, 8),
+    0x2d => (Op::ShiftRight(Register8::L), 2, 8),
+    0x2e => (Op::ShiftRightIndirect, 2, 16),
+    0x2f => (Op::ShiftRight(Register8::A), 2, 8),
+
     0x30 => (Op::Swap(Register8::B), 2, 8),
     0x31 => (Op::Swap(Register8::C), 2, 8),
     0x32 => (Op::Swap(Register8::D), 2, 8),
@@ -493,6 +510,14 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x35 => (Op::Swap(Register8::L), 2, 8),
 
     0x37 => (Op::Swap(Register8::A), 2, 8),
+    0x38 => (Op::ShiftRightLogical(Register8::B), 2, 8),
+    0x39 => (Op::ShiftRightLogical(Register8::C), 2, 8),
+    0x3a => (Op::ShiftRightLogical(Register8::D), 2, 8),
+    0x3b => (Op::ShiftRightLogical(Register8::E), 2, 8),
+    0x3c => (Op::ShiftRightLogical(Register8::H), 2, 8),
+    0x3d => (Op::ShiftRightLogical(Register8::L), 2, 8),
+    0x3e => (Op::ShiftRightLogicalIndirect, 2, 16),
+    0x3f => (Op::ShiftRightLogical(Register8::A), 2, 8),
 
     0x40 => (Op::BitTest(Register8::B, 0x01), 2, 8),
     0x41 => (Op::BitTest(Register8::C, 0x01), 2, 8),
