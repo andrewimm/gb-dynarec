@@ -114,6 +114,7 @@ impl Emitter {
       Op::BitSet(reg, mask) => self.encode_bit_set(reg, mask, ip_increment, exec),
       Op::BitClear(reg, mask) => self.encode_bit_clear(reg, mask, ip_increment, exec),
       Op::BitTest(reg, mask) => self.encode_bit_test(reg, mask, ip_increment, exec),
+      Op::Swap(reg) => self.encode_swap(reg, ip_increment, exec),
       Op::LoadStackPointerToMemory(addr) => self.encode_load_stack_to_memory(addr, ip_increment, exec),
       Op::LoadAToMemory(addr) => self.encode_load_a_to_memory(addr, ip_increment, exec),
       Op::LoadAFromMemory(addr) => self.encode_load_a_from_memory(addr, ip_increment, exec),
@@ -503,6 +504,15 @@ impl Emitter {
 
   pub fn encode_bit_test(&self, reg: Register8, mask: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let len = emit_bit_test(map_register_8(reg), mask, exec); 
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn encode_swap(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let x86_reg = map_register_8(reg);
+    let mut len = emit_swap(x86_reg, exec);
+    len += emit_or_register_8(x86_reg, x86_reg, &mut exec[len..]);
+    len += emit_store_flags(0x80, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x70, &mut exec[len..]);
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
@@ -1163,6 +1173,22 @@ fn emit_rotate_right(register: X86Reg8, exec: &mut [u8]) -> usize {
     _ => panic!("Cannot rotate register"),
   };
   2
+}
+
+fn emit_swap(register: X86Reg8, exec: &mut [u8]) -> usize {
+  exec[0] = 0xc0; // rol reg, 4
+  exec[1] = match register {
+    X86Reg8::AH => 0xc4,
+    X86Reg8::BH => 0xc7,
+    X86Reg8::BL => 0xc3,
+    X86Reg8::CH => 0xc5,
+    X86Reg8::CL => 0xc1,
+    X86Reg8::DH => 0xc6,
+    X86Reg8::DL => 0xc2,
+    _ => panic!("Cannot rotate register"),
+  };
+  exec[2] = 4;
+  3
 }
 
 fn emit_complement_a(exec: &mut [u8]) -> usize {
