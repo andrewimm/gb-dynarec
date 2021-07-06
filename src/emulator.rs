@@ -1,6 +1,8 @@
 use crate::cache::CodeCache;
+use crate::cart::Header;
 use crate::cpu::{self, Registers};
 use crate::mem::MemoryAreas;
+use std::fs::File;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum RunState {
@@ -23,6 +25,16 @@ impl Core {
       cache: CodeCache::new(),
       registers: Registers::new(),
       memory: MemoryAreas::with_rom(code),
+      interrupts_enabled: false,
+      run_state: RunState::Run,
+    }
+  }
+
+  pub fn from_rom_file(rom_file: &mut File, header: Header) -> Self {
+    Self {
+      cache: CodeCache::new(),
+      registers: Registers::after_boot(),
+      memory: MemoryAreas::with_rom_file(rom_file, &header),
       interrupts_enabled: false,
       run_state: RunState::Run,
     }

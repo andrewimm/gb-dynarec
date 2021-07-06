@@ -1,3 +1,6 @@
+use crate::cart::Header;
+use std::fs::File;
+
 pub struct MemoryAreas {
   pub rom: Box<[u8]>,
   pub video_ram: Box<[u8]>,
@@ -8,6 +11,8 @@ pub struct MemoryAreas {
   pub vram_bank: usize,
   pub cram_bank: usize,
   pub wram_bank: usize,
+
+  rom_mapped: bool,
 }
 
 impl MemoryAreas {
@@ -26,12 +31,58 @@ impl MemoryAreas {
       vram_bank: 0,
       cram_bank: 0,
       wram_bank: 1,
+
+      rom_mapped: false,
+    }
+  }
+
+  pub fn with_rom_file(rom_file: &mut File, header: &Header) -> Self {
+    let rom_size = header.get_rom_size_bytes();
+    let video_ram_size = 8 * 1024; // 8KB for DMB, 16KB for CGB
+    let cart_ram_size = header.get_ram_size_bytes();
+    let work_ram_size = 8 * 1024; // 8KB for DMG, 32KB for CGB
+
+    let rom = crate::system::get_rom_buffer(rom_file, rom_size);
+    let video_ram = create_buffer(video_ram_size);
+    let cart_ram = create_buffer(cart_ram_size);
+    let work_ram = create_buffer(work_ram_size);
+
+    Self {
+      rom,
+      video_ram,
+      cart_ram,
+      work_ram,
+      rom_bank: 1,
+      vram_bank: 0,
+      cram_bank: 0,
+      wram_bank: 1,
+
+      rom_mapped: true,
     }
   }
 
   pub fn as_ptr(&self) -> *const Self {
     self as *const Self
   }
+}
+
+impl Drop for MemoryAreas {
+  fn drop(&mut self) {
+    if !self.rom_mapped {
+      return;
+    }
+    let reset = vec![0xc3, 0x00, 0x00]; // JP 0x0000, infinite loop
+    let old_rom = std::mem::replace(&mut self.rom, reset.into_boxed_slice());
+    crate::system::drop_rom_buffer(old_rom);
+  }
+}
+
+fn create_buffer(size: usize) -> Box<[u8]> {
+  let mut buffer = Vec::<u8>::with_capacity(size);
+  for _ in 0..size {
+    buffer.push(0);
+  }
+  buffer.into_boxed_slice()
 }
 
 pub extern "sysv64" fn memory_read_byte(areas: *const MemoryAreas, addr: u16) -> u8 {

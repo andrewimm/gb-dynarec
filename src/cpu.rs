@@ -21,6 +21,17 @@ impl Registers {
     }
   }
 
+  pub fn after_boot() -> Self {
+    Self {
+      af: 0x01b0,
+      bc: 0x0013,
+      de: 0x00d8,
+      hl: 0x014d,
+      sp: 0xfffe,
+      ip: 0x0100,
+    }
+  }
+
   pub fn get_af(&self) -> u32 {
     self.af
   }
