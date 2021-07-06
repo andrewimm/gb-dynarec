@@ -1,11 +1,19 @@
+
+#[cfg(unix)]
 pub mod linux;
+#[cfg(windows)]
+pub mod windows;
 
 use crate::cpu::Registers;
 use crate::decoder::decode;
 use crate::emitter::Emitter;
 use crate::mem::MemoryAreas;
-use linux::ExecutableMemory;
 use std::collections::BTreeMap;
+
+#[cfg(unix)]
+use linux::ExecutableMemory;
+#[cfg(windows)]
+use self::windows::ExecutableMemory;
 
 pub struct CodeBlock {
   pub offset: usize,

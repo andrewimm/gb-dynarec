@@ -1,6 +1,12 @@
+#[cfg(unix)]
 pub mod linux;
+#[cfg(windows)]
+pub mod windows;
 
+#[cfg(unix)]
 use linux::{map_rom_file, unmap_rom_file};
+#[cfg(windows)]
+use self::windows::{map_rom_file, unmap_rom_file};
 
 use crate::cart::Header;
 use std::fs::File;
