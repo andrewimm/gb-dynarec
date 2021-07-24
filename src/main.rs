@@ -2,6 +2,7 @@ pub mod cache;
 pub mod cpu;
 pub mod cart;
 pub mod decoder;
+pub mod devices;
 pub mod emitter;
 pub mod emulator;
 pub mod mem;
@@ -11,24 +12,33 @@ use std::env;
 
 fn main() {
   // Initialize UI/Audio/Input
+
+  let mut core = match get_file_arg().and_then(load_rom) {
+    Some(core) => core,
+    None => fallback_core(),
+  };
   
+  // Build and reset Dynarec Core
+
+  loop {
+    core.run_code_block();
+  }
+}
+
+fn get_file_arg() -> Option<String> {
+  let mut iter = env::args();
+  let _ = iter.next();
+  iter.next()
+}
+
+fn load_rom(rom_file_name: String) -> Option<emulator::Core> {
   // Load ROM, parse MMC type
   let mut rom_file = {
-    let mut iter = env::args();
-    let _ = iter.next();
-    let rom_file_arg = iter.next();
-    let rom_file_name = match rom_file_arg {
-      Some(name) => name,
-      None => {
-        print_usage();
-        return;
-      },
-    };
     match system::open_rom_file(rom_file_name) {
       Ok(fd) => fd,
       Err(msg) => {
         println!("{}", msg);
-        return;
+        return None;
       },
     }
   };
@@ -36,24 +46,35 @@ fn main() {
     Ok(head) => head,
     Err(msg) => {
       println!("{}", msg);
-      return;
+      return None;
     }
   };
 
   if !header.valid_checksum() {
     println!("ROM file is corrupt: invalid header checksum");
-    return;
+    return None;
   }
 
   println!("Loading \"{}\"", header.get_title());
 
-  // Build and reset Dynarec Core
+  Some(emulator::Core::from_rom_file(&mut rom_file, header))
+}
 
-  let mut core = emulator::Core::from_rom_file(&mut rom_file, header);
-  core.run_code_block();
-  core.run_code_block();
-  core.run_code_block();
-  core.run_code_block();
+fn fallback_core() -> emulator::Core {
+  println!("No ROM, loading fallback");
+  // send "GB" over serial port
+  let code = vec![
+    0x3e, 0x47,
+    0xe0, 0x01,
+    0x3e, 0x80,
+    0xe0, 0x02,
+    0x3e, 0x42,
+    0xe0, 0x01,
+    0x3e, 0x80,
+    0xe0, 0x02,
+    0xc3, 0x10, 0x00,
+  ];
+  emulator::Core::with_code_block(code.into_boxed_slice())
 }
 
 fn print_usage() {

@@ -1,4 +1,5 @@
 use crate::cart::Header;
+use crate::devices::io::IO;
 use std::fs::File;
 
 pub struct MemoryAreas {
@@ -6,11 +7,14 @@ pub struct MemoryAreas {
   pub video_ram: Box<[u8]>,
   pub cart_ram: Box<[u8]>,
   pub work_ram: Box<[u8]>,
+  pub high_ram: Box<[u8]>,
 
   pub rom_bank: usize,
   pub vram_bank: usize,
   pub cram_bank: usize,
   pub wram_bank: usize,
+
+  pub io: IO,
 
   rom_mapped: bool,
 }
@@ -26,11 +30,14 @@ impl MemoryAreas {
       video_ram: vec![].into_boxed_slice(),
       cart_ram: vec![].into_boxed_slice(),
       work_ram: work_ram.into_boxed_slice(),
+      high_ram: vec![].into_boxed_slice(),
 
       rom_bank: 1,
       vram_bank: 0,
       cram_bank: 0,
       wram_bank: 1,
+
+      io: IO::new(),
 
       rom_mapped: false,
     }
@@ -46,16 +53,20 @@ impl MemoryAreas {
     let video_ram = create_buffer(video_ram_size);
     let cart_ram = create_buffer(cart_ram_size);
     let work_ram = create_buffer(work_ram_size);
+    let high_ram = create_buffer(127);
 
     Self {
       rom,
       video_ram,
       cart_ram,
       work_ram,
+      high_ram,
       rom_bank: 1,
       vram_bank: 0,
       cram_bank: 0,
       wram_bank: 1,
+
+      io: IO::new(),
 
       rom_mapped: true,
     }
@@ -107,8 +118,23 @@ pub extern "sysv64" fn memory_read_byte(areas: *const MemoryAreas, addr: u16) ->
   if addr < 0xe000 { // Work RAM Bank NN
     return 0;
   }
-  // Mirror and I/O
-  0
+  if addr < 0xfe00 { // Mirror
+    return 0;
+  }
+  if addr < 0xfea0 { // OAM
+    return 0;
+  }
+  if addr < 0xff00 { // unused
+    return 0;
+  }
+  if addr < 0xff80 { // I/O
+    return memory_areas.io.get_byte(addr);
+  }
+  if addr == 0xffff { // Interrupt Mask
+    return 0;
+  }
+  // High RAM
+  memory_areas.high_ram[addr as usize & 0x7f]
 }
 
 pub extern "sysv64" fn memory_write_byte(areas: *mut MemoryAreas, addr: u16, value: u8) {
@@ -137,7 +163,24 @@ pub extern "sysv64" fn memory_write_byte(areas: *mut MemoryAreas, addr: u16, val
     memory_areas.work_ram[0x1000 * memory_areas.wram_bank + offset] = value;
     return;
   }
-  // Mirror and I/O
+  if addr < 0xfe00 { // Mirror
+    return;
+  }
+  if addr < 0xfea0 { // OAM
+    return;
+  }
+  if addr < 0xff00 { // unused
+    return;
+  }
+  if addr < 0xff80 { // I/O
+    memory_areas.io.set_byte(addr, value);
+    return;
+  }
+  if addr == 0xffff { // Interrupt Mask
+    return;
+  }
+  // High RAM
+  memory_areas.high_ram[addr as usize & 0x7f] = value;
 }
 
 pub extern "sysv64" fn memory_write_word(areas: *mut MemoryAreas, addr: u16, value: u16) {

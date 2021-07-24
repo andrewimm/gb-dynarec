@@ -71,7 +71,7 @@ impl Core {
       },
       _ => (),
     }
-    println!("[{}] {:?}", result, self.registers);
+    //println!("[{}] {:?}", result, self.registers);
   }
 }
 
@@ -1859,6 +1859,17 @@ mod tests {
     assert_eq!(core.registers.get_ip(), 0x02);
     core.run_code_block();
     assert_eq!(core.registers.get_ip(), 0x15);
+  }
+
+  #[test]
+  fn jump_hl() {
+    let code = vec![
+      0x21, 0x40, 0x03, // LD HL, 0x0340
+      0xe9, // JP (HL)
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x0340);
   }
 
   #[test]

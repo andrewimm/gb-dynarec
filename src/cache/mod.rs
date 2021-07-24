@@ -72,7 +72,19 @@ impl CodeCache {
     self.exec_memory.make_executable();
     self.write_cursor = write_cursor;
 
+    self.insert_code_block(ip, starting_offset, write_cursor - starting_offset);
+
     starting_offset
+  }
+
+  fn insert_code_block(&mut self, ip: usize, offset: usize, length: usize) {
+    self.code_blocks.insert(
+      ip,
+      CodeBlock {
+        offset,
+        length,
+      },
+    );
   }
 
   pub fn call(&self, offset: usize, registers: &mut Registers) -> u8 {

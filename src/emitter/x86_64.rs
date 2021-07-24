@@ -134,6 +134,7 @@ impl Emitter {
       Op::DAA => self.encode_daa(ip_increment, exec),
 
       Op::Jump(cond, address) => self.encode_jump(cond, address, exec),
+      Op::JumpHL => self.encode_jump_hl(exec),
       Op::JumpRelative(cond, offset) => self.encode_jump_relative(cond, offset, exec),
       Op::Call(cond, address) => self.encode_call(cond, address, exec),
       Op::ResetVector(vector) => self.encode_reset(vector, exec),
@@ -738,6 +739,10 @@ impl Emitter {
     len
   }
 
+  pub fn encode_jump_hl(&self, exec: &mut [u8]) -> usize {
+    emit_jump_hl(exec)
+  }
+
   pub fn encode_call(&self, condition: JumpCondition, address: u16, exec: &mut [u8]) -> usize {
     let mut len;
     match condition {
@@ -1312,6 +1317,15 @@ fn emit_jump(addr: u16, exec: &mut [u8]) -> usize {
   exec[2] = 0xbd;
   emit_immediate_u16(addr, &mut exec[3..]);
   5
+}
+
+fn emit_jump_hl(exec: &mut [u8]) -> usize {
+  // shortcut for "mov r13w, cx"
+  exec[0] = 0x66;
+  exec[1] = 0x41;
+  exec[2] = 0x89;
+  exec[3] = 0xcd;
+  4
 }
 
 fn emit_flag_test(test: u8, exec: &mut [u8]) -> usize {
