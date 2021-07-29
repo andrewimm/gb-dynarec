@@ -1,7 +1,7 @@
 use crate::cache::CodeCache;
 use crate::cart::Header;
 use crate::cpu::{self, Registers};
-use crate::mem::MemoryAreas;
+use crate::mem::{MemoryAreas, memory_write_word};
 use std::fs::File;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -40,6 +40,43 @@ impl Core {
     }
   }
 
+  /// If interrupts are enabled, check the current interrupt flags and enter the
+  /// highest-priority active interrupt.
+  pub fn handle_interrupt(&mut self) {
+    if !self.interrupts_enabled {
+      return;
+    }
+    let interrupts = self.memory.io.get_active_interrupts();
+    if interrupts == 0 {
+      return;
+    }
+    let vector: u32 = if interrupts & 1 != 0 {
+      0x40 // VBLANK
+    } else if interrupts & 2 != 0 {
+      0x48 // LCD STAT
+    } else if interrupts & 4 != 0 {
+      0x50 // timer
+    } else if interrupts & 8 != 0 {
+      0x58 // serial transfer
+    } else {
+      0x60 // input
+    };
+    // for timing accuracy, skip five machine cycles
+
+    self.push_ip();
+    self.registers.ip = vector;
+  }
+
+  /// Push the instruction pointer onto the stack, such as at the start of an
+  /// interrupt request.
+  pub fn push_ip(&mut self) {
+    self.registers.sp = self.registers.sp.wrapping_sub(2);
+    let ip = self.registers.ip as u16;
+    let sp = self.registers.sp as u16;
+    let mem_ptr = &mut self.memory as *mut MemoryAreas;
+    memory_write_word(mem_ptr, sp, ip);
+  }
+
   /// Run the next code block, then check for interrupts
   pub fn run_code_block(&mut self) {
     let address = {
@@ -71,6 +108,7 @@ impl Core {
       },
       _ => (),
     }
+    self.handle_interrupt();
     //println!("[{}] {:?}", result, self.registers);
   }
 }
@@ -2035,5 +2073,23 @@ mod tests {
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block();
     assert_eq!(core.run_state, RunState::Halt);
+  }
+
+  #[test]
+  fn interrupt() {
+    let code = vec![
+      0x31, 0xff, 0xc0, // LD SP, 0xc0ff
+      0xfb, // EI
+      0x3e, 0x1f, // LD A, 0x1f
+      0xea, 0xff, 0xff, // LD (0xffff), A
+      0x3e, 0x10, // LD A, 0x10
+      0xea, 0x0f, 0xff, // LD (0xff0f), A
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block(); // EI will end a block
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x60);
+    assert_eq!(core.memory.work_ram[0xfe], 0x00);
+    assert_eq!(core.memory.work_ram[0xfd], 0x0e);
   }
 }

@@ -131,7 +131,7 @@ pub extern "sysv64" fn memory_read_byte(areas: *const MemoryAreas, addr: u16) ->
     return memory_areas.io.get_byte(addr);
   }
   if addr == 0xffff { // Interrupt Mask
-    return 0;
+    return memory_areas.io.interrupt_mask;
   }
   // High RAM
   memory_areas.high_ram[addr as usize & 0x7f]
@@ -177,6 +177,7 @@ pub extern "sysv64" fn memory_write_byte(areas: *mut MemoryAreas, addr: u16, val
     return;
   }
   if addr == 0xffff { // Interrupt Mask
+    memory_areas.io.interrupt_mask = value & 0x1f;
     return;
   }
   // High RAM
