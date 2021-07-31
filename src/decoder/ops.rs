@@ -99,6 +99,68 @@ impl Op {
   }
 }
 
+impl std::fmt::Display for Op {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Op::Invalid(_) => f.write_str("INVALID"),
+      Op::NoOp => f.write_str("NOP"),
+      Op::Stop => f.write_str("STOP 0"),
+      Op::Halt => f.write_str("HALT"),
+      Op::Load16(reg, value) =>
+        f.write_fmt(format_args!("LD {}, {:#06X}", reg, value)),
+
+      Op::Load8Immediate(reg, value) => f.write_fmt(format_args!("LD {}, {:#04X}", reg, value)),
+      
+      Op::LoadAToMemory(addr) => f.write_fmt(format_args!("LD ({:#06X}), A", addr)),
+      Op::LoadAFromMemory(addr) => f.write_fmt(format_args!("LD A, ({:#06X})", addr)),
+      Op::LoadToHighMem => f.write_str("LD (C), A"),
+      Op::LoadFromHighMem => f.write_str("LD A, (C)"),
+      Op::LoadStackOffset(off) => f.write_fmt(format_args!("LD HL, SP + {:#04X}", off)),
+      Op::LoadToStackPointer => f.write_str("LD SP, HL"),
+      Op::DAA => f.write_str("DAA"),
+      Op::ComplementA => f.write_str("CPL"),
+      Op::ComplementCarryFlag => f.write_str("CCF"),
+      Op::SetCarryFlag => f.write_str("SCF"),
+      Op::Jump(cond, addr) => match cond {
+        JumpCondition::Always => f.write_fmt(format_args!("JP {:#06X}", addr)),
+        JumpCondition::Carry => f.write_fmt(format_args!("JP C, {:#06X}", addr)),
+        JumpCondition::Zero => f.write_fmt(format_args!("JP Z, {:#06X}", addr)),
+        JumpCondition::NoCarry => f.write_fmt(format_args!("JP NC, {:#06X}", addr)),
+        JumpCondition::NonZero => f.write_fmt(format_args!("JP NZ, {:#06X}", addr)),
+      },
+      Op::JumpHL => f.write_str("JP (HL)"),
+      Op::JumpRelative(cond, offset) => match cond {
+        JumpCondition::Always => f.write_fmt(format_args!("JR {:#04X}", offset)),
+        JumpCondition::Carry => f.write_fmt(format_args!("JR C, {:#04X}", offset)),
+        JumpCondition::Zero => f.write_fmt(format_args!("JR Z, {:#04X}", offset)),
+        JumpCondition::NoCarry => f.write_fmt(format_args!("JR NC, {:#04X}", offset)),
+        JumpCondition::NonZero => f.write_fmt(format_args!("JR NZ, {:#04X}", offset)),
+      },
+      Op::Call(cond, addr) => match cond {
+        JumpCondition::Always => f.write_fmt(format_args!("CALL {:#06X}", addr)),
+        JumpCondition::Carry => f.write_fmt(format_args!("CALL C, {:#06X}", addr)),
+        JumpCondition::Zero => f.write_fmt(format_args!("CALL Z, {:#06X}", addr)),
+        JumpCondition::NoCarry => f.write_fmt(format_args!("CALL NC, {:#06X}", addr)),
+        JumpCondition::NonZero => f.write_fmt(format_args!("CALL NZ, {:#06X}", addr)),
+      },
+      Op::Return(cond) => match cond {
+        JumpCondition::Always => f.write_str("RET"),
+        JumpCondition::Carry => f.write_str("RET C"),
+        JumpCondition::Zero => f.write_str("RET Z"),
+        JumpCondition::NoCarry => f.write_str("RET NC"),
+        JumpCondition::NonZero => f.write_str("RET NZ"),
+      },
+      Op::ResetVector(vec) => f.write_fmt(format_args!("RST {:#04X}", vec)),
+      Op::ReturnFromInterrupt => f.write_str("RETI"),
+      Op::InterruptEnable => f.write_str("EI"),
+      Op::InterruptDisable => f.write_str("DI"),
+      Op::Push(reg) => f.write_fmt(format_args!("PUSH {}", reg)),
+      Op::Pop(reg) => f.write_fmt(format_args!("POP {}", reg)),
+      _ => f.write_str("???"),
+    }
+  }
+}
+
 #[derive(Copy, Clone)]
 pub enum IndirectLocation {
   BC,
@@ -132,6 +194,21 @@ pub enum Register8 {
   L,
 }
 
+impl std::fmt::Display for Register8 {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Register8::A => f.write_str("A"),
+      Register8::F => f.write_str("F"),
+      Register8::B => f.write_str("B"),
+      Register8::C => f.write_str("C"),
+      Register8::D => f.write_str("D"),
+      Register8::E => f.write_str("E"),
+      Register8::H => f.write_str("H"),
+      Register8::L => f.write_str("L"),
+    }
+  }
+}
+
 #[derive(Copy, Clone)]
 pub enum Register16 {
   AF,
@@ -139,6 +216,18 @@ pub enum Register16 {
   DE,
   HL,
   SP,
+}
+
+impl std::fmt::Display for Register16 {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Register16::AF => f.write_str("AF"),
+      Register16::BC => f.write_str("BC"),
+      Register16::DE => f.write_str("DE"),
+      Register16::HL => f.write_str("HL"),
+      Register16::SP => f.write_str("SP"),
+    }
+  }
 }
 
 pub enum JumpCondition {

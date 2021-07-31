@@ -1,6 +1,7 @@
 pub mod cache;
 pub mod cpu;
 pub mod cart;
+pub mod debug;
 pub mod decoder;
 pub mod devices;
 pub mod emitter;
@@ -74,6 +75,14 @@ fn fallback_core() -> emulator::Core {
     0xe0, 0x02,
     0xc3, 0x10, 0x00,
   ];
+
+  {
+    let disassembly = debug::disassembly::disassemble(0, &code.clone().into_boxed_slice());
+    for instr in disassembly.iter() {
+      println!("{}", instr);
+    }
+  }
+
   emulator::Core::with_code_block(code.into_boxed_slice())
 }
 
