@@ -2092,4 +2092,39 @@ mod tests {
     assert_eq!(core.memory.work_ram[0xfe], 0x00);
     assert_eq!(core.memory.work_ram[0xfd], 0x0e);
   }
+
+  #[test]
+  fn masked_interrupts() {
+    let code = vec![
+      0x31, 0xff, 0xc0, // LD SP, 0xc0ff
+      0xfb, // EI
+      0x3e, 0x03, // LD A, 0x03
+      0xea, 0xff, 0xff, // LD (0xffff), A
+      0x3e, 0x10, // LD A, 0x10
+      0xea, 0x0f, 0xff, // LD (0xff0f), A
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block(); // EI will end a block
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x0e);
+    assert_eq!(core.registers.get_sp(), 0xc0ff);
+  }
+
+  #[test]
+  fn multiple_interrupts() {
+    let code = vec![
+      0x31, 0xff, 0xc0, // LD SP, 0xc0ff
+      0xfb, // EI
+      0x3e, 0x1f, // LD A, 0x1f
+      0xea, 0xff, 0xff, // LD (0xffff), A
+      0x3e, 0x12, // LD A, 0x12
+      0xea, 0x0f, 0xff, // LD (0xff0f), A
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block(); // EI will end a block
+    core.run_code_block();
+    assert_eq!(core.registers.get_ip(), 0x48);
+    assert_eq!(core.memory.work_ram[0xfe], 0x00);
+    assert_eq!(core.memory.work_ram[0xfd], 0x0e);
+  }
 }
