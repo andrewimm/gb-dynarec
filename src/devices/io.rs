@@ -1,10 +1,12 @@
 use super::interrupts::InterruptFlag;
+use super::joypad::Joypad;
 use super::serial::SerialComms;
 use super::timer::Timer;
 
 pub struct IO {
   pub interrupt_flag: InterruptFlag,
   pub interrupt_mask: u8,
+  pub joypad: Box<Joypad>,
   pub serial: Box<SerialComms>,
   pub timer: Box<Timer>,
 }
@@ -14,6 +16,7 @@ impl IO {
     Self {
       interrupt_flag: InterruptFlag::empty(),
       interrupt_mask: 0,
+      joypad: Box::new(Joypad::new()),
       serial: Box::new(SerialComms::new()),
       timer: Box::new(Timer::new()),
     }
@@ -21,6 +24,7 @@ impl IO {
 
   pub fn set_byte(&mut self, addr: u16, value: u8) {
     match addr & 0xff {
+      0x00 => self.joypad.set_value(value),
       0x01 => self.serial.set_data(value),
       0x02 => self.serial.set_control(value),
       0x03 => (),
@@ -39,6 +43,8 @@ impl IO {
 
   pub fn get_byte(&self, addr: u16) -> u8 {
     match addr & 0xff {
+      0x00 => self.joypad.get_value(),
+
       0x03 => 0xff,
       0x04 => self.timer.get_divider(),
       0x05 => self.timer.get_counter(),
@@ -59,6 +65,7 @@ impl IO {
   /// called to keep the rest of the devices in sync.
   pub fn run_clock_cycles(&mut self, cycles: usize) {
     let mut flags = self.timer.run_cycles(cycles as u32);
+    flags |= self.joypad.get_interrupt();
 
     self.interrupt_flag |= flags;
   }

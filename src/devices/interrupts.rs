@@ -11,6 +11,26 @@ impl InterruptFlag {
     Self(0)
   }
 
+  pub fn vsync() -> Self {
+    Self(1)
+  }
+
+  pub fn stat() -> Self {
+    Self(2)
+  }
+
+  pub fn timer() -> Self {
+    Self(4)
+  }
+
+  pub fn serial() -> Self {
+    Self(8)
+  }
+
+  pub fn joypad() -> Self {
+    Self(16)
+  }
+
   pub fn as_u8(&self) -> u8 {
     self.0
   }

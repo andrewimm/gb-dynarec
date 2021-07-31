@@ -65,7 +65,7 @@ impl Timer {
   fn increment_counter(&mut self) -> InterruptFlag {
     if self.counter == 0xff {
       self.counter = self.modulo;
-      InterruptFlag::new(1)
+      InterruptFlag::timer()
     } else {
       self.counter = self.counter.wrapping_add(1);
       InterruptFlag::empty()
@@ -187,7 +187,7 @@ mod tests {
     timer.set_timer_control(5);
     assert_eq!(timer.run_cycles(255 * 16), InterruptFlag::empty());
     assert_eq!(timer.get_counter(), 255);
-    assert_eq!(timer.run_cycles(16), InterruptFlag::new(1));
+    assert_eq!(timer.run_cycles(16), InterruptFlag::timer());
     assert_eq!(timer.get_counter(), 200);
   }
 }
