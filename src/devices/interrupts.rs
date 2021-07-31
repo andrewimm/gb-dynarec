@@ -34,6 +34,10 @@ impl InterruptFlag {
   pub fn as_u8(&self) -> u8 {
     self.0
   }
+
+  pub fn clear(&mut self, flag: u8) {
+    self.0 &= !flag;
+  }
 }
 
 impl std::ops::BitOr for InterruptFlag {

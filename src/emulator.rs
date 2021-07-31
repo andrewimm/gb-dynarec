@@ -50,17 +50,18 @@ impl Core {
     if interrupts == 0 {
       return;
     }
-    let vector: u32 = if interrupts & 1 != 0 {
-      0x40 // VBLANK
+    let (vector, clear): (u32, u8) = if interrupts & 1 != 0 {
+      (0x40, 0x01) // VBLANK
     } else if interrupts & 2 != 0 {
-      0x48 // LCD STAT
+      (0x48, 0x02) // LCD STAT
     } else if interrupts & 4 != 0 {
-      0x50 // timer
+      (0x50, 0x04) // timer
     } else if interrupts & 8 != 0 {
-      0x58 // serial transfer
+      (0x58, 0x08) // serial transfer
     } else {
-      0x60 // input
+      (0x60, 0x10) // input
     };
+    self.memory.io.interrupt_flag.clear(clear);
     // for timing accuracy, skip five machine cycles
 
     self.push_ip();
@@ -2091,6 +2092,7 @@ mod tests {
     assert_eq!(core.registers.get_ip(), 0x60);
     assert_eq!(core.memory.work_ram[0xfe], 0x00);
     assert_eq!(core.memory.work_ram[0xfd], 0x0e);
+    assert_eq!(core.memory.io.interrupt_flag.as_u8(), 0x00);
   }
 
   #[test]
@@ -2108,6 +2110,7 @@ mod tests {
     core.run_code_block();
     assert_eq!(core.registers.get_ip(), 0x0e);
     assert_eq!(core.registers.get_sp(), 0xc0ff);
+    assert_eq!(core.memory.io.interrupt_flag.as_u8(), 0x10);
   }
 
   #[test]
@@ -2126,5 +2129,6 @@ mod tests {
     assert_eq!(core.registers.get_ip(), 0x48);
     assert_eq!(core.memory.work_ram[0xfe], 0x00);
     assert_eq!(core.memory.work_ram[0xfd], 0x0e);
+    assert_eq!(core.memory.io.interrupt_flag.as_u8(), 0x10);
   }
 }
