@@ -109,14 +109,80 @@ impl std::fmt::Display for Op {
       Op::Halt => f.write_str("HALT"),
       Op::Load16(reg, value) =>
         f.write_fmt(format_args!("LD {}, {:#06X}", reg, value)),
-
-      Op::Load8Immediate(reg, value) => f.write_fmt(format_args!("LD {}, {:#04X}", reg, value)),
-      
+      Op::LoadToIndirect(indirect, reg) =>
+        f.write_fmt(format_args!("LD {}, {}", indirect, reg)),
+      Op::LoadImmediateToHLIndirect(value) =>
+        f.write_fmt(format_args!("LD (HL), {:#04X}", value)),
+      Op::LoadFromIndirect(reg, indirect) =>
+        f.write_fmt(format_args!("LD {}, {}", reg, indirect)),
+      Op::Increment16(reg) => f.write_fmt(format_args!("INC {}", reg)),
+      Op::Decrement16(reg) => f.write_fmt(format_args!("DEC {}", reg)),
+      Op::Increment8(reg) => f.write_fmt(format_args!("INC {}", reg)),
+      Op::Decrement8(reg) => f.write_fmt(format_args!("DEC {}", reg)),
+      Op::IncrementHLIndirect => f.write_str("INC (HL)"),
+      Op::DecrementHLIndirect => f.write_str("DEC (HL)"),
+      Op::Load8(dest, src) =>
+        f.write_fmt(format_args!("LD {}, {}", dest, src)),
+      Op::Load8Immediate(dest, value) =>
+        f.write_fmt(format_args!("LD {}, {:#04X}", dest, value)),
+      Op::Add8(dest, src) =>
+        f.write_fmt(format_args!("ADD {}, {}", dest, src)),
+      Op::AddWithCarry8(dest, src) =>
+        f.write_fmt(format_args!("ADC {}, {}", dest, src)),
+      Op::AddAbsolute8(value) => f.write_fmt(format_args!("ADD A, {:#04X}", value)),
+      Op::AddAbsoluteWithCarry8(value) => f.write_fmt(format_args!("ADC A, {:#04X}", value)),
+      Op::AddHL(reg) => f.write_fmt(format_args!("ADD HL, {}", reg)),
+      Op::AddIndirect => f.write_str("ADD A, (HL)"),
+      Op::AddIndirectWithCarry => f.write_str("ADC A, (HL)"),
+      Op::Sub8(dest, src) =>
+        f.write_fmt(format_args!("SUB {}, {}", dest, src)),
+      Op::SubAbsolute8(value) => f.write_fmt(format_args!("SUB A, {:#04X}", value)),
+      Op::SubWithCarry8(dest, src) =>
+        f.write_fmt(format_args!("SBC {}, {}", dest, src)),
+      Op::SubAbsoluteWithCarry8(value) => f.write_fmt(format_args!("SBC A, {:#04X}", value)),
+      Op::SubIndirect => f.write_str("SUB (HL)"),
+      Op::SubIndirectWithCarry => f.write_str("SBC (HL)"),
+      Op::And8(dest, src) =>
+        f.write_fmt(format_args!("AND {}, {}", dest, src)),
+      Op::AndAbsolute8(value) => f.write_fmt(format_args!("AND A, {:#04X}", value)),
+      Op::AndIndirect => f.write_str("AND (HL)"),
+      Op::Or8(dest, src) =>
+        f.write_fmt(format_args!("OR {}, {}", dest, src)),
+      Op::OrAbsolute8(value) => f.write_fmt(format_args!("OR A, {:#04X}", value)),
+      Op::OrIndirect => f.write_str("OR (HL)"),
+      Op::Xor8(dest, src) =>
+        f.write_fmt(format_args!("XOR {}, {}", dest, src)),
+      Op::XorAbsolute8(value) => f.write_fmt(format_args!("XOR A, {:#04X}", value)),
+      Op::XorIndirect => f.write_str("XOR (HL)"),
+      Op::Compare8(reg) => f.write_fmt(format_args!("CP {}", reg)),
+      Op::CompareAbsolute8(value) => f.write_fmt(format_args!("CP A, {:#04X}", value)),
+      Op::CompareIndirect => f.write_str("CP (HL)"),
+      Op::RotateLeftCarryA => f.write_str("RLCA"),
+      Op::RotateLeftCarry(reg) => f.write_fmt(format_args!("RLC {}", reg)),
+      Op::RotateLeftA => f.write_str("RLA"),
+      Op::RotateLeft(reg) => f.write_fmt(format_args!("RL {}", reg)),
+      Op::RotateRightCarryA => f.write_str("RRCA"),
+      Op::RotateRightCarry(reg) => f.write_fmt(format_args!("RRC {}", reg)),
+      Op::RotateRightA => f.write_str("RRA"),
+      Op::RotateRight(reg) => f.write_fmt(format_args!("RR {}", reg)),
+      Op::ShiftLeft(reg) => f.write_fmt(format_args!("SLA {}", reg)),
+      Op::ShiftLeftIndirect => f.write_str("SLA (HL)"),
+      Op::ShiftRight(reg) => f.write_fmt(format_args!("SRA {}", reg)),
+      Op::ShiftRightIndirect => f.write_str("SRA (HL)"),
+      Op::ShiftRightLogical(reg) => f.write_fmt(format_args!("SRL {}", reg)),
+      Op::ShiftRightLogicalIndirect => f.write_str("SRL (HL)"),
+      Op::Swap(reg) => f.write_fmt(format_args!("SWAP {}", reg)),
+      Op::BitTest(reg, bit) => f.write_fmt(format_args!("BIT {:#010b}, {}", bit, reg)),
+      Op::BitClear(reg, bit) => f.write_fmt(format_args!("RES {:#010b}, {}", bit, reg)),
+      Op::BitSet(reg, bit) => f.write_fmt(format_args!("SET {:#010b}, {}", bit, reg)),
+      Op::LoadStackPointerToMemory(addr) =>
+        f.write_fmt(format_args!("LD ({:#06X}), SP", addr)),
+      Op::AddSP(offset) => f.write_fmt(format_args!("ADD SP, {:#04X}", offset)),
       Op::LoadAToMemory(addr) => f.write_fmt(format_args!("LD ({:#06X}), A", addr)),
       Op::LoadAFromMemory(addr) => f.write_fmt(format_args!("LD A, ({:#06X})", addr)),
       Op::LoadToHighMem => f.write_str("LD (C), A"),
       Op::LoadFromHighMem => f.write_str("LD A, (C)"),
-      Op::LoadStackOffset(off) => f.write_fmt(format_args!("LD HL, SP + {:#04X}", off)),
+      Op::LoadStackOffset(off) => f.write_fmt(format_args!("LDHL SP, {:#04X}", off)),
       Op::LoadToStackPointer => f.write_str("LD SP, HL"),
       Op::DAA => f.write_str("DAA"),
       Op::ComplementA => f.write_str("CPL"),
@@ -157,7 +223,6 @@ impl std::fmt::Display for Op {
       Op::InterruptDisable => f.write_str("DI"),
       Op::Push(reg) => f.write_fmt(format_args!("PUSH {}", reg)),
       Op::Pop(reg) => f.write_fmt(format_args!("POP {}", reg)),
-      _ => f.write_str("???"),
     }
   }
 }
@@ -171,16 +236,16 @@ pub enum IndirectLocation {
   HLDecrement,
 }
 
-#[derive(Copy, Clone)]
-pub enum Source8 {
-  A,
-  B,
-  C,
-  D,
-  E,
-  H,
-  L,
-  Literal(u8),
+impl std::fmt::Display for IndirectLocation {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      IndirectLocation::BC => f.write_str("(BC)"),
+      IndirectLocation::DE => f.write_str("(DE)"),
+      IndirectLocation::HL => f.write_str("(HL)"),
+      IndirectLocation::HLIncrement => f.write_str("(HL+)"),
+      IndirectLocation::HLDecrement => f.write_str("(HL-)"),
+    }
+  }
 }
 
 #[derive(Copy, Clone)]

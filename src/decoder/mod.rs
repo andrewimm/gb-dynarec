@@ -1,6 +1,6 @@
 pub mod ops;
 
-use ops::{IndirectLocation, JumpCondition, Op, Register8, Register16, Source8};
+use ops::{IndirectLocation, JumpCondition, Op, Register8, Register16};
 
 pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
   match instructions[0] {

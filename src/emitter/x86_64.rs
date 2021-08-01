@@ -1,5 +1,5 @@
 use crate::cpu;
-use crate::decoder::ops::{Op, IndirectLocation, JumpCondition, Register8, Register16, Source8};
+use crate::decoder::ops::{Op, IndirectLocation, JumpCondition, Register8, Register16};
 use crate::mem::MemoryAreas;
 
 pub struct Emitter {
