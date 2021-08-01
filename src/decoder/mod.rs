@@ -10,7 +10,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       let op = Op::Load16(Register16::BC, value);
       (op, 3, 12)
     },
-    0x02 => (Op::LoadToIndirect(IndirectLocation::BC, Source8::A), 1, 8),
+    0x02 => (Op::LoadToIndirect(IndirectLocation::BC, Register8::A), 1, 8),
     0x03 => (Op::Increment16(Register16::BC), 1, 8),
     0x04 => (Op::Increment8(Register8::B), 1, 4),
     0x05 => (Op::Decrement8(Register8::B), 1, 4),
@@ -43,7 +43,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       let op = Op::Load16(Register16::DE, value);
       (op, 3, 12)
     },
-    0x12 => (Op::LoadToIndirect(IndirectLocation::DE, Source8::A), 1, 8),
+    0x12 => (Op::LoadToIndirect(IndirectLocation::DE, Register8::A), 1, 8),
     0x13 => (Op::Increment16(Register16::DE), 1, 8),
     0x14 => (Op::Increment8(Register8::D), 1, 4),
     0x15 => (Op::Decrement8(Register8::D), 1, 4),
@@ -80,7 +80,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       let op = Op::Load16(Register16::HL, value);
       (op, 3, 12)
     },
-    0x22 => (Op::LoadToIndirect(IndirectLocation::HLIncrement, Source8::A), 1, 8),
+    0x22 => (Op::LoadToIndirect(IndirectLocation::HLIncrement, Register8::A), 1, 8),
     0x23 => (Op::Increment16(Register16::HL), 1, 8),
     0x24 => (Op::Increment8(Register8::H), 1, 4),
     0x25 => (Op::Decrement8(Register8::H), 1, 4),
@@ -117,13 +117,13 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       let op = Op::Load16(Register16::SP, value);
       (op, 3, 12)
     },
-    0x32 => (Op::LoadToIndirect(IndirectLocation::HLDecrement, Source8::A), 1, 8),
+    0x32 => (Op::LoadToIndirect(IndirectLocation::HLDecrement, Register8::A), 1, 8),
     0x33 => (Op::Increment16(Register16::SP), 1, 8),
     0x34 => (Op::IncrementHLIndirect, 1, 12),
     0x35 => (Op::DecrementHLIndirect, 1, 12),
     0x36 => {
       let value = instructions[1];
-      let op = Op::LoadToIndirect(IndirectLocation::HL, Source8::Literal(value));
+      let op = Op::LoadImmediateToHLIndirect(value);
       (op, 2, 12)
     },
     0x37 => (Op::SetCarryFlag, 1, 4),
@@ -194,14 +194,14 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0x6e => (Op::LoadFromIndirect(Register8::L, IndirectLocation::HL), 1, 8),
     0x6f => (Op::Load8(Register8::L, Register8::A), 1, 4),
 
-    0x70 => (Op::LoadToIndirect(IndirectLocation::HL, Source8::B), 1, 8),
-    0x71 => (Op::LoadToIndirect(IndirectLocation::HL, Source8::C), 1, 8),
-    0x72 => (Op::LoadToIndirect(IndirectLocation::HL, Source8::D), 1, 8),
-    0x73 => (Op::LoadToIndirect(IndirectLocation::HL, Source8::E), 1, 8),
-    0x74 => (Op::LoadToIndirect(IndirectLocation::HL, Source8::H), 1, 8),
-    0x75 => (Op::LoadToIndirect(IndirectLocation::HL, Source8::L), 1, 8),
+    0x70 => (Op::LoadToIndirect(IndirectLocation::HL, Register8::B), 1, 8),
+    0x71 => (Op::LoadToIndirect(IndirectLocation::HL, Register8::C), 1, 8),
+    0x72 => (Op::LoadToIndirect(IndirectLocation::HL, Register8::D), 1, 8),
+    0x73 => (Op::LoadToIndirect(IndirectLocation::HL, Register8::E), 1, 8),
+    0x74 => (Op::LoadToIndirect(IndirectLocation::HL, Register8::H), 1, 8),
+    0x75 => (Op::LoadToIndirect(IndirectLocation::HL, Register8::L), 1, 8),
     0x76 => (Op::Halt, 1, 4),
-    0x77 => (Op::LoadToIndirect(IndirectLocation::HL, Source8::A), 1, 8),
+    0x77 => (Op::LoadToIndirect(IndirectLocation::HL, Register8::A), 1, 8),
     0x78 => (Op::Load8(Register8::A, Register8::B), 1, 4),
     0x79 => (Op::Load8(Register8::A, Register8::C), 1, 4),
     0x7a => (Op::Load8(Register8::A, Register8::D), 1, 4),

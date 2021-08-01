@@ -4,7 +4,8 @@ pub enum Op {
   Stop,
   Halt,
   Load16(Register16, u16),
-  LoadToIndirect(IndirectLocation, Source8),
+  LoadToIndirect(IndirectLocation, Register8),
+  LoadImmediateToHLIndirect(u8),
   LoadFromIndirect(Register8, IndirectLocation),
   Increment16(Register16),
   Decrement16(Register16),
@@ -185,7 +186,6 @@ pub enum Source8 {
 #[derive(Copy, Clone)]
 pub enum Register8 {
   A,
-  F,
   B,
   C,
   D,
@@ -198,7 +198,6 @@ impl std::fmt::Display for Register8 {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Register8::A => f.write_str("A"),
-      Register8::F => f.write_str("F"),
       Register8::B => f.write_str("B"),
       Register8::C => f.write_str("C"),
       Register8::D => f.write_str("D"),

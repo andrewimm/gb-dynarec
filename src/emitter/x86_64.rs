@@ -67,6 +67,7 @@ impl Emitter {
       Op::Load8(dest, src) => self.encode_load_8_register(dest, src, ip_increment, exec),
       Op::Load16(reg, value) => self.encode_load_16(reg, value, ip_increment, exec),
       Op::LoadToIndirect(location, value) => self.encode_load_to_indirect(location, value, ip_increment, exec),
+      Op::LoadImmediateToHLIndirect(value) => self.endcode_load_immediate_to_hl_indirect(value, ip_increment, exec),
       Op::LoadFromIndirect(reg, location) => self.encode_load_from_indirect(reg, location, ip_increment, exec),
       Op::Load8Immediate(reg, value) => self.encode_load_8(reg, value, ip_increment, exec),
       Op::Increment8(reg) => self.encode_increment_8(reg, ip_increment, exec),
@@ -571,17 +572,20 @@ impl Emitter {
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
-  pub fn encode_load_to_indirect(&self, location: IndirectLocation, value: Source8, ip_increment: usize, exec: &mut [u8]) -> usize {
+  pub fn encode_load_to_indirect(&self, location: IndirectLocation, value: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let indirect_address = map_indirect_location_to_register(location);
-    let mut len = match value {
-      Source8::Literal(literal) => emit_memory_write_literal(exec, self.mem as usize, indirect_address, literal),
-      _ => emit_memory_write(exec, self.mem as usize, indirect_address, map_source_to_register(value)),
-    };
+    let mut len= emit_memory_write(exec, self.mem as usize, indirect_address, map_register_8(value));
     len += match location {
       IndirectLocation::HLIncrement => emit_increment_16(X86Reg16::CX, &mut exec[len..]),
       IndirectLocation::HLDecrement => emit_decrement_16(X86Reg16::CX, &mut exec[len..]),
       _ => 0,
     };
+    len + emit_ip_increment(ip_increment, &mut exec[len..])
+  }
+
+  pub fn endcode_load_immediate_to_hl_indirect(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let indirect_address = map_indirect_location_to_register(IndirectLocation::HL);
+    let len = emit_memory_write_literal(exec, self.mem as usize, indirect_address, value);
     len + emit_ip_increment(ip_increment, &mut exec[len..])
   }
 
@@ -2161,7 +2165,6 @@ fn map_register_16(gb_reg: Register16) -> X86Reg16 {
 fn map_register_8(gb_reg: Register8) -> X86Reg8 {
   match gb_reg {
     Register8::A => X86Reg8::AH,
-    Register8::F => X86Reg8::AL,
     Register8::B => X86Reg8::BH,
     Register8::C => X86Reg8::BL,
     Register8::D => X86Reg8::DH,
@@ -2178,19 +2181,6 @@ fn map_indirect_location_to_register(location: IndirectLocation) -> X86Reg16 {
     IndirectLocation::HL
       | IndirectLocation::HLDecrement
       | IndirectLocation::HLIncrement => X86Reg16::CX,
-  }
-}
-
-fn map_source_to_register(source: Source8) -> X86Reg8 {
-  match source {
-    Source8::A => X86Reg8::AH,
-    Source8::B => X86Reg8::BH,
-    Source8::C => X86Reg8::BL,
-    Source8::D => X86Reg8::DH,
-    Source8::E => X86Reg8::DL,
-    Source8::H => X86Reg8::CH,
-    Source8::L => X86Reg8::CL,
-    _ => unreachable!("Literal is not passed to this mapping"),
   }
 }
 
