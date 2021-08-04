@@ -109,6 +109,9 @@ impl Core {
       },
       _ => (),
     }
+    let cycles_consumed = self.registers.get_consumed_cycles();
+    // catch up memmapped devices
+    self.memory.run_clock_cycles(cycles_consumed);
     self.handle_interrupt();
     //println!("[{}] {:?}", result, self.registers);
   }

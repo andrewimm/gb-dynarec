@@ -75,6 +75,10 @@ impl MemoryAreas {
   pub fn as_ptr(&self) -> *const Self {
     self as *const Self
   }
+
+  pub fn run_clock_cycles(&mut self, cycles: usize) {
+    self.io.run_clock_cycles(cycles, &self.video_ram);
+  }
 }
 
 impl Drop for MemoryAreas {

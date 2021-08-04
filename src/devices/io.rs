@@ -63,7 +63,7 @@ impl IO {
   /// Catch up the internal clocks of peripherals on the bus.
   /// Every time the CPU runs for a series of instructions, this should be
   /// called to keep the rest of the devices in sync.
-  pub fn run_clock_cycles(&mut self, cycles: usize) {
+  pub fn run_clock_cycles(&mut self, cycles: usize, vram: &Box<[u8]>) {
     let mut flags = self.timer.run_cycles(cycles as u32);
     flags |= self.joypad.get_interrupt();
 

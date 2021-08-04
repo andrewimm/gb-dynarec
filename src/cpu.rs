@@ -7,6 +7,7 @@ pub struct Registers {
   pub hl: u32,
   pub sp: u32,
   pub ip: u32,
+  cycles: u32,
 }
 
 impl Registers {
@@ -18,6 +19,7 @@ impl Registers {
       hl: 0,
       sp: 0,
       ip: 0,
+      cycles: 0,
     }
   }
 
@@ -29,6 +31,7 @@ impl Registers {
       hl: 0x014d,
       sp: 0xfffe,
       ip: 0x0100,
+      cycles: 0,
     }
   }
 
@@ -54,6 +57,12 @@ impl Registers {
 
   pub fn get_ip(&self) -> u32 {
     self.ip
+  }
+
+  pub fn get_consumed_cycles(&mut self) -> usize {
+    let cycles = self.cycles;
+    self.cycles = 0;
+    cycles as usize
   }
 }
 
