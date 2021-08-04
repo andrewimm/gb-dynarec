@@ -1607,10 +1607,14 @@ mod tests {
     let code = vec![
       0x31, 0x14, 0xc0, // LD SP, 0xc014
       0xf8, 0x23, // LD HL, SP+0x23
+      0x18, 0x00, // JR 0
+      0xf8, 0xfe, // LD HL, SP-2
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block();
     assert_eq!(core.registers.get_hl(), 0xc037);
+    core.run_code_block();
+    assert_eq!(core.registers.get_hl(), 0xc012);
   }
 
   #[test]
