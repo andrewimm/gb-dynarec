@@ -2,6 +2,7 @@ use super::interrupts::InterruptFlag;
 use super::joypad::Joypad;
 use super::serial::SerialComms;
 use super::timer::Timer;
+use super::video::VideoState;
 
 pub struct IO {
   pub interrupt_flag: InterruptFlag,
@@ -9,6 +10,7 @@ pub struct IO {
   pub joypad: Box<Joypad>,
   pub serial: Box<SerialComms>,
   pub timer: Box<Timer>,
+  pub video: Box<VideoState>,
 }
 
 impl IO {
@@ -19,6 +21,7 @@ impl IO {
       joypad: Box::new(Joypad::new()),
       serial: Box::new(SerialComms::new()),
       timer: Box::new(Timer::new()),
+      video: Box::new(VideoState::new()),
     }
   }
 
@@ -37,6 +40,13 @@ impl IO {
       },
 
       0x0f => self.interrupt_flag = InterruptFlag::new(value & 0x1f),
+
+      0x40 => self.video.set_lcd_control(value),
+      0x41 => self.video.set_lcd_status(value),
+      0x42 => self.video.set_scroll_y(value),
+      0x43 => self.video.set_scroll_x(value),
+      0x44 => (),
+      0x45 => self.video.set_ly_compare(value),
       _ => (),
     }
   }
@@ -52,6 +62,13 @@ impl IO {
       0x07 => self.timer.get_timer_control(),
 
       0x0f => self.interrupt_flag.as_u8(),
+
+      0x40 => self.video.get_lcd_control(),
+      0x41 => self.video.get_lcd_status(),
+      0x42 => self.video.get_scroll_y(),
+      0x43 => self.video.get_scroll_x(),
+      0x44 => self.video.get_ly(),
+      0x45 => self.video.get_ly_compare(),
       _ => 0xff,
     }
   }
@@ -65,6 +82,7 @@ impl IO {
   /// called to keep the rest of the devices in sync.
   pub fn run_clock_cycles(&mut self, cycles: usize, vram: &Box<[u8]>) {
     let mut flags = self.timer.run_cycles(cycles as u32);
+    flags |= self.video.run_clock_cycles(cycles, vram);
     flags |= self.joypad.get_interrupt();
 
     self.interrupt_flag |= flags;

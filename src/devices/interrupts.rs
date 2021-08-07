@@ -11,7 +11,7 @@ impl InterruptFlag {
     Self(0)
   }
 
-  pub fn vsync() -> Self {
+  pub fn vblank() -> Self {
     Self(1)
   }
 
