@@ -163,64 +163,76 @@ impl Emitter {
   }
 
   pub fn encode_noop(&self, exec: &mut [u8]) -> usize {
-    emit_ip_increment(1, exec)
+    let len = emit_ip_increment(1, exec);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_stop(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_return_code(cpu::STATUS_STOP, exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_return_code(cpu::STATUS_STOP, exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_halt(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_return_code(cpu::STATUS_HALT, exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_return_code(cpu::STATUS_HALT, exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_interrupt_enable(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_return_code(cpu::STATUS_INTERRUPT_ENABLE, exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_return_code(cpu::STATUS_INTERRUPT_ENABLE, exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_interrupt_disable(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_return_code(cpu::STATUS_INTERRUPT_DISABLE, exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_return_code(cpu::STATUS_INTERRUPT_DISABLE, exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_load_16(&self, dest: Register16, value: u16, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_move_16(map_register_16(dest), value, exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_move_16(map_register_16(dest), value, exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(3, &mut exec[len..])
   }
 
   pub fn encode_load_8(&self, dest: Register8, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_move_8(map_register_8(dest), value, exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_move_8(map_register_8(dest), value, exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_load_8_register(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_reg_to_reg_move(map_register_8(dest), map_register_8(src), exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_reg_to_reg_move(map_register_8(dest), map_register_8(src), exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_increment_8(&self, dest: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_increment_8(map_register_8(dest), exec);
     len += emit_store_flags(0xe0, false, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_decrement_8(&self, dest: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_decrement_8(map_register_8(dest), exec);
     len += emit_store_flags(0xe0, true, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_increment_16(&self, dest: Register16, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_increment_16(map_register_16(dest), exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_increment_16(map_register_16(dest), exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_decrement_16(&self, dest: Register16, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_decrement_16(map_register_16(dest), exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_decrement_16(map_register_16(dest), exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_increment_hl_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -228,7 +240,8 @@ impl Emitter {
     len += emit_increment_8(X86Reg8::DL, &mut exec[len..]);
     len += emit_store_flags(0xe0, false, &mut exec[len..]);
     len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(3, &mut exec[len..])
   }
 
   pub fn encode_decrement_hl_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -236,20 +249,23 @@ impl Emitter {
     len += emit_decrement_8(X86Reg8::DL, &mut exec[len..]);
     len += emit_store_flags(0xe0, true, &mut exec[len..]);
     len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(3, &mut exec[len..])
   }
 
   pub fn encode_add_register_8(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_add_register_8(map_register_8(dest), map_register_8(src), exec);
     len += emit_store_flags(0xf0, false, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_add_register_8_with_carry(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_restore_carry(exec);
     len += emit_add_register_8_with_carry(map_register_8(dest), map_register_8(src), &mut exec[len..]);
     len += emit_store_flags(0xf0, false, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_add_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -258,7 +274,8 @@ impl Emitter {
     len += emit_add_register_8(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
     len += emit_store_flags(0xf0, false, &mut exec[len..]);
     len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_add_indirect_with_carry(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -268,20 +285,23 @@ impl Emitter {
     len += emit_add_register_8_with_carry(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
     len += emit_store_flags(0xf0, false, &mut exec[len..]);
     len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_sub_register_8(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_sub_register_8(map_register_8(dest), map_register_8(src), exec);
     len += emit_store_flags(0xf0, true, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_sub_register_8_with_carry(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_restore_carry(exec);
     len += emit_sub_register_8_with_carry(map_register_8(dest), map_register_8(src), &mut exec[len..]);
     len += emit_store_flags(0xf0, true, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_sub_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -290,7 +310,8 @@ impl Emitter {
     len += emit_sub_register_8(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
     len += emit_store_flags(0xf0, true, &mut exec[len..]);
     len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_sub_indirect_with_carry(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -300,7 +321,8 @@ impl Emitter {
     len += emit_sub_register_8_with_carry(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
     len += emit_store_flags(0xf0, true, &mut exec[len..]);
     len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_and_register_8(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -308,7 +330,8 @@ impl Emitter {
     len += emit_store_flags(0x80, false, &mut exec[len..]);
     len += emit_force_flags_off(0x05, &mut exec[len..]);
     len += emit_force_flags_on(0x20, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_and_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -319,14 +342,16 @@ impl Emitter {
     len += emit_force_flags_off(0x05, &mut exec[len..]);
     len += emit_force_flags_on(0x20, &mut exec[len..]);
     len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_or_register_8(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_or_register_8(map_register_8(dest), map_register_8(src), exec);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
     len += emit_force_flags_off(0x07, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_or_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -336,14 +361,16 @@ impl Emitter {
     len += emit_store_flags(0x80, false, &mut exec[len..]);
     len += emit_force_flags_off(0x07, &mut exec[len..]);
     len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_xor_register_8(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_xor_register_8(map_register_8(dest), map_register_8(src), exec);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
     len += emit_force_flags_off(0x07, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_xor_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -353,13 +380,15 @@ impl Emitter {
     len += emit_store_flags(0x80, false, &mut exec[len..]);
     len += emit_force_flags_off(0x07, &mut exec[len..]);
     len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_compare(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_compare(map_register_8(reg), exec);
     len += emit_store_flags(0xf0, true, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_compare_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -368,32 +397,37 @@ impl Emitter {
     len += emit_compare(X86Reg8::DL, &mut exec[len..]);
     len += emit_store_flags(0xf0, true, &mut exec[len..]);
     len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_add_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_add_absolute_8(value, exec);
     len += emit_store_flags(0xf0, false, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_adc_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_restore_carry(exec);
     len += emit_adc_absolute_8(value, &mut exec[len..]);
     len += emit_store_flags(0xf0, false, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_sub_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_sub_absolute_8(value, exec);
     len += emit_store_flags(0xf0, true, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_sbc_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_sbc_absolute_8(value, exec);
     len += emit_store_flags(0xf0, true, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_and_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -401,33 +435,38 @@ impl Emitter {
     len += emit_store_flags(0xc0, false, &mut exec[len..]);
     len += emit_force_flags_off(0x10, &mut exec[len..]);
     len += emit_force_flags_on(0x20, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_or_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_or_absolute_8(value, exec);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
     len += emit_force_flags_off(0x70, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_xor_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_xor_absolute_8(value, exec);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
     len += emit_force_flags_off(0x70, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_cmp_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_cmp_absolute_8(value, exec);
     len += emit_store_flags(0xf0, true, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_add_hl(&self, src: Register16, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_add_hl(map_register_16(src), exec);
     len += emit_store_flags(0x70, false, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_rotate_left_a(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -435,7 +474,8 @@ impl Emitter {
     len += emit_rotate_left_through_carry(X86Reg8::AH, &mut exec[len..]);
     len += emit_store_flags(0x10, false, &mut exec[len..]);
     len += emit_force_flags_off(0xe0, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_rotate_left(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -443,14 +483,16 @@ impl Emitter {
     len += emit_rotate_left_through_carry(map_register_8(reg), &mut exec[len..]);
     len += emit_store_flags(0x90, false, &mut exec[len..]);
     len += emit_force_flags_off(0x60, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_rotate_left_carry_a(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_rotate_left(X86Reg8::AH, exec);
     len += emit_store_flags(0x10, false, &mut exec[len..]);
     len += emit_force_flags_off(0xe0, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_rotate_left_carry(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -459,7 +501,8 @@ impl Emitter {
     len += emit_store_flags(0x10, false, &mut exec[len..]);
     len += emit_zero_flag_test(xreg, &mut exec[len..]);
     len += emit_force_flags_off(0x60, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_rotate_right_a(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -467,7 +510,8 @@ impl Emitter {
     len += emit_rotate_right_through_carry(X86Reg8::AH, &mut exec[len..]);
     len += emit_store_flags(0x10, false, &mut exec[len..]);
     len += emit_force_flags_off(0xe0, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_rotate_right(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -475,28 +519,32 @@ impl Emitter {
     len += emit_rotate_right_through_carry(map_register_8(reg), &mut exec[len..]);
     len += emit_store_flags(0x90, false, &mut exec[len..]);
     len += emit_force_flags_off(0x60, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_rotate_right_carry_a(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_rotate_right(X86Reg8::AH, exec);
     len += emit_store_flags(0x10, false, &mut exec[len..]);
     len += emit_force_flags_off(0xe0, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_rotate_right_carry(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_rotate_right(map_register_8(reg), exec);
     len += emit_store_flags(0x10, false, &mut exec[len..]);
     len += emit_force_flags_off(0xe0, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_shift_left(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_shift_left(map_register_8(reg), exec);
     len += emit_store_flags(0x90, false, &mut exec[len..]);
     len += emit_force_flags_off(0x60, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_shift_left_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -505,14 +553,16 @@ impl Emitter {
     len += emit_store_flags(0x90, false, &mut exec[len..]);
     len += emit_force_flags_off(0x60, &mut exec[len..]);
     len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(4, &mut exec[len..])
   }
 
   pub fn encode_shift_right(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_shift_right(map_register_8(reg), exec);
     len += emit_store_flags(0x90, false, &mut exec[len..]);
     len += emit_force_flags_off(0x60, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_shift_right_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -521,14 +571,16 @@ impl Emitter {
     len += emit_store_flags(0x90, false, &mut exec[len..]);
     len += emit_force_flags_off(0x60, &mut exec[len..]);
     len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(4, &mut exec[len..])
   }
 
   pub fn encode_shift_right_logical(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_shift_right_logical(map_register_8(reg), exec);
     len += emit_store_flags(0x90, false, &mut exec[len..]);
     len += emit_force_flags_off(0x60, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_shift_right_logical_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -537,40 +589,47 @@ impl Emitter {
     len += emit_store_flags(0x90, false, &mut exec[len..]);
     len += emit_force_flags_off(0x60, &mut exec[len..]);
     len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(4, &mut exec[len..])
   }
 
   pub fn encode_complement_a(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_complement_a(exec);
     len += emit_force_flags_on(0x60, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_set_carry(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_force_flags_off(0x60, exec);
     len += emit_force_flags_on(0x10, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_complement_carry(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_force_flags_off(0x60, exec);
     len += emit_complement_carry(&mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_bit_set(&self, reg: Register8, mask: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_register_or(map_register_8(reg), mask, exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_register_or(map_register_8(reg), mask, exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_bit_clear(&self, reg: Register8, mask: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_register_and(map_register_8(reg), !mask, exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_register_and(map_register_8(reg), !mask, exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_bit_test(&self, reg: Register8, mask: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_bit_test(map_register_8(reg), mask, exec); 
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_bit_test(map_register_8(reg), mask, exec); 
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_swap(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -579,7 +638,8 @@ impl Emitter {
     len += emit_or_register_8(x86_reg, x86_reg, &mut exec[len..]);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
     len += emit_force_flags_off(0x70, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_load_to_indirect(&self, location: IndirectLocation, value: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -590,13 +650,15 @@ impl Emitter {
       IndirectLocation::HLDecrement => emit_decrement_16(X86Reg16::CX, &mut exec[len..]),
       _ => 0,
     };
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn endcode_load_immediate_to_hl_indirect(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let indirect_address = map_indirect_location_to_register(IndirectLocation::HL);
-    let len = emit_memory_write_literal(exec, self.mem as usize, indirect_address, value);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_memory_write_literal(exec, self.mem as usize, indirect_address, value);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(3, &mut exec[len..])
   }
 
   pub fn encode_load_from_indirect(&self, reg: Register8, location: IndirectLocation, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -608,74 +670,89 @@ impl Emitter {
       IndirectLocation::HLDecrement => emit_decrement_16(X86Reg16::CX, &mut exec[len..]),
       _ => 0,
     };
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_load_stack_to_memory(&self, addr: u16, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_write_stack_to_memory(exec, self.mem as usize, addr);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_write_stack_to_memory(exec, self.mem as usize, addr);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(5, &mut exec[len..])
   }
 
   pub fn encode_load_a_to_memory(&self, addr: u16, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_write_a_to_memory(exec, self.mem as usize, addr);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_write_a_to_memory(exec, self.mem as usize, addr);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(3, &mut exec[len..])
   }
 
   pub fn encode_load_a_from_memory(&self, addr: u16, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_read_a_from_memory(exec, self.mem as usize, addr);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_read_a_from_memory(exec, self.mem as usize, addr);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(3, &mut exec[len..])
   }
 
   pub fn encode_load_to_high_mem(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_load_to_high_mem(exec, self.mem as usize);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_load_to_high_mem(exec, self.mem as usize);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_load_from_high_mem(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_load_from_high_mem(exec, self.mem as usize);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_load_from_high_mem(exec, self.mem as usize);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_push(&self, reg: Register16, ip_increment: usize, exec: &mut [u8]) -> usize {
     let source = map_register_16(reg);
-    let len = emit_push(source, self.mem as usize, exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_push(source, self.mem as usize, exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(4, &mut exec[len..])
   }
 
   pub fn encode_pop(&self, reg: Register16, ip_increment: usize, exec: &mut [u8]) -> usize {
     let dest = map_register_16(reg);
-    let len = emit_pop(dest, self.mem as usize, exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_pop(dest, self.mem as usize, exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(4, &mut exec[len..])
   }
 
   pub fn encode_add_sp(&self, offset: i8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_sp_signed_offset(offset, exec);
     len += emit_store_flags(0x70, false, &mut exec[len..]);
     len += emit_force_flags_off(0x80, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(4, &mut exec[len..])
   }
 
   pub fn encode_load_to_sp(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_load_to_sp(exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_load_to_sp(exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
   }
 
   pub fn encode_load_stack_offset(&self, offset: i8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_load_stack_offset(offset, exec);
     len += emit_store_flags(0x70, false, &mut exec[len..]);
     len += emit_force_flags_off(0x80, &mut exec[len..]);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(3, &mut exec[len..])
   }
 
   pub fn encode_daa(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let len = emit_daa(exec);
-    len + emit_ip_increment(ip_increment, &mut exec[len..])
+    let mut len = emit_daa(exec);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_jump(&self, condition: JumpCondition, address: u16, exec: &mut [u8]) -> usize {
     let mut len;
     match condition {
-      JumpCondition::Always => return emit_jump(address, exec),
+      JumpCondition::Always => {
+        len = emit_jump(address, exec);
+        len += emit_cycle_increment(4, &mut exec[len..]);
+      },
       // On the GB, a conditional jump either changes the IP to an entirely new
       // address, or it increments it to the next instruction.
       // A Jump will end a code block, so this instruction doesn't need to
@@ -687,31 +764,39 @@ impl Emitter {
       // first hits an instruction that modifies the IP to the new location.
       JumpCondition::Zero => {
         len = emit_ip_increment(3, exec);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         // test against the zero flag (0x80); if it's set, the host's zero flag
         // will be cleared
         len += emit_flag_test(0x80, &mut exec[len..]);
         // If the condition was set, this flag will be cleared and the jump will
         // fail. It will fall through to the successive instruction, which sets
         // the value of the IP directly.
-        len += emit_jump_zero(5, &mut exec[len..]);
+        len += emit_jump_zero(4 + 5, &mut exec[len..]);
+        len += emit_cycle_increment(1, &mut exec[len..]);
         len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
       },
       JumpCondition::NonZero => {
         len = emit_ip_increment(3, exec);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         len += emit_flag_test(0x80, &mut exec[len..]);
-        len += emit_jump_nonzero(5, &mut exec[len..]);
+        len += emit_jump_nonzero(4 + 5, &mut exec[len..]);
+        len += emit_cycle_increment(1, &mut exec[len..]);
         len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
       },
       JumpCondition::Carry => {
         len = emit_ip_increment(3, exec);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         len += emit_flag_test(0x10, &mut exec[len..]);
-        len += emit_jump_zero(5, &mut exec[len..]);
+        len += emit_jump_zero(4 + 5, &mut exec[len..]);
+        len += emit_cycle_increment(1, &mut exec[len..]);
         len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
       },
       JumpCondition::NoCarry => {
         len = emit_ip_increment(3, exec);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         len += emit_flag_test(0x10, &mut exec[len..]);
-        len += emit_jump_nonzero(5, &mut exec[len..]);
+        len += emit_jump_nonzero(4 + 5, &mut exec[len..]);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
       },
     }
@@ -724,29 +809,38 @@ impl Emitter {
       JumpCondition::Always => {
         len = emit_ip_increment(2, exec);
         len += emit_ip_signed_offset(offset, &mut exec[len..]);
+        len += emit_cycle_increment(3, &mut exec[len..]);
       },
       JumpCondition::Zero => {
         len = emit_ip_increment(2, exec);
+        len += emit_cycle_increment(2, &mut exec[len..]);
         len += emit_flag_test(0x80, &mut exec[len..]);
-        len += emit_jump_zero(5, &mut exec[len..]);
+        len += emit_jump_zero(4 + 5, &mut exec[len..]);
+        len += emit_cycle_increment(1, &mut exec[len..]);
         len += emit_ip_signed_offset(offset, &mut exec[len..]);
       },
       JumpCondition::NonZero => {
         len = emit_ip_increment(2, exec);
+        len += emit_cycle_increment(2, &mut exec[len..]);
         len += emit_flag_test(0x80, &mut exec[len..]);
-        len += emit_jump_nonzero(5, &mut exec[len..]);
+        len += emit_jump_nonzero(4 + 5, &mut exec[len..]);
+        len += emit_cycle_increment(1, &mut exec[len..]);
         len += emit_ip_signed_offset(offset, &mut exec[len..]);
       },
       JumpCondition::Carry => {
         len = emit_ip_increment(3, exec);
+        len += emit_cycle_increment(2, &mut exec[len..]);
         len += emit_flag_test(0x10, &mut exec[len..]);
-        len += emit_jump_zero(5, &mut exec[len..]);
+        len += emit_jump_zero(4 + 5, &mut exec[len..]);
+        len += emit_cycle_increment(1, &mut exec[len..]);
         len += emit_ip_signed_offset(offset, &mut exec[len..]);
       },
       JumpCondition::NoCarry => {
         len = emit_ip_increment(3, exec);
+        len += emit_cycle_increment(2, &mut exec[len..]);
         len += emit_flag_test(0x10, &mut exec[len..]);
-        len += emit_jump_nonzero(5, &mut exec[len..]);
+        len += emit_jump_nonzero(4 + 5, &mut exec[len..]);
+        len += emit_cycle_increment(1, &mut exec[len..]);
         len += emit_ip_signed_offset(offset, &mut exec[len..]);
       },
     }
@@ -754,7 +848,8 @@ impl Emitter {
   }
 
   pub fn encode_jump_hl(&self, exec: &mut [u8]) -> usize {
-    emit_jump_hl(exec)
+    let len = emit_jump_hl(exec);
+    len + emit_cycle_increment(1, &mut exec[len..])
   }
 
   pub fn encode_call(&self, condition: JumpCondition, address: u16, exec: &mut [u8]) -> usize {
@@ -764,43 +859,54 @@ impl Emitter {
         len = emit_ip_increment(3, exec);
         len += emit_push(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
         len += emit_jump(address, &mut exec[len..]);
+        len += emit_cycle_increment(6, &mut exec[len..]);
       },
       JumpCondition::Zero => {
         len = emit_ip_increment(3, exec);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         len += emit_flag_test(0x80, &mut exec[len..]);
+        // The offset is not known ahead of time, so set it to zero and modify
+        // the byte when the full block is written.
         len += emit_jump_zero(0, &mut exec[len..]);
         let offset_location = len;
         len += emit_push(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
       },
       JumpCondition::NonZero => {
         len = emit_ip_increment(3, exec);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         len += emit_flag_test(0x80, &mut exec[len..]);
         len += emit_jump_nonzero(0, &mut exec[len..]);
         let offset_location = len;
         len += emit_push(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
       },
       JumpCondition::Carry => {
         len = emit_ip_increment(3, exec);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         len += emit_flag_test(0x10, &mut exec[len..]);
         len += emit_jump_zero(0, &mut exec[len..]);
         let offset_location = len;
         len += emit_push(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
       },
       JumpCondition::NoCarry => {
         len = emit_ip_increment(3, exec);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         len += emit_flag_test(0x10, &mut exec[len..]);
         len += emit_jump_nonzero(0, &mut exec[len..]);
         let offset_location = len;
         len += emit_push(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
@@ -812,6 +918,7 @@ impl Emitter {
   pub fn encode_reset(&self, vector: u16, exec: &mut [u8]) -> usize {
     let mut len = emit_ip_increment(1, exec);
     len += emit_push(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+    len += emit_cycle_increment(4, &mut exec[len..]);
     len + emit_jump(vector, &mut exec[len..])
   }
 
@@ -820,40 +927,49 @@ impl Emitter {
     match condition {
       JumpCondition::Always => {
         len = emit_pop(X86Reg16::R9, self.mem as usize, exec);
+        len += emit_cycle_increment(4, &mut exec[len..]);
       },
       JumpCondition::Zero => {
         len = emit_ip_increment(1, exec);
+        len += emit_cycle_increment(2, &mut exec[len..]);
         len += emit_flag_test(0x80, &mut exec[len..]);
         len += emit_jump_zero(0, &mut exec[len..]);
         let offset_location = len;
         len += emit_pop(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
       },
       JumpCondition::NonZero => {
         len = emit_ip_increment(1, exec);
+        len += emit_cycle_increment(2, &mut exec[len..]);
         len += emit_flag_test(0x80, &mut exec[len..]);
         len += emit_jump_nonzero(0, &mut exec[len..]);
         let offset_location = len;
         len += emit_pop(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
       },
       JumpCondition::Carry => {
         len = emit_ip_increment(1, exec);
+        len += emit_cycle_increment(2, &mut exec[len..]);
         len += emit_flag_test(0x10, &mut exec[len..]);
         len += emit_jump_zero(0, &mut exec[len..]);
         let offset_location = len;
         len += emit_pop(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
       },
       JumpCondition::NoCarry => {
         len = emit_ip_increment(1, exec);
+        len += emit_cycle_increment(2, &mut exec[len..]);
         len += emit_flag_test(0x10, &mut exec[len..]);
         len += emit_jump_nonzero(0, &mut exec[len..]);
         let offset_location = len;
         len += emit_pop(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_cycle_increment(3, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
       },
@@ -862,7 +978,8 @@ impl Emitter {
   }
 
   pub fn encode_return_from_interrupt(&self, exec: &mut [u8]) -> usize {
-    let len = emit_pop(X86Reg16::R9, self.mem as usize, exec);
+    let mut len = emit_pop(X86Reg16::R9, self.mem as usize, exec);
+    len += emit_cycle_increment(4, &mut exec[len..]);
     len + emit_return_code(cpu::STATUS_INTERRUPT_ENABLE, &mut exec[len..])
   }
 }
@@ -1407,6 +1524,14 @@ fn emit_ip_signed_offset(offset: i8, exec: &mut [u8]) -> usize {
   exec[3] = 0xc1;
   exec[4] = offset as u8;
   5
+}
+
+fn emit_cycle_increment(amount: usize, exec: &mut [u8]) -> usize {
+  exec[0] = 0x49; // add r11, amount
+  exec[1] = 0x83;
+  exec[2] = 0xc3;
+  exec[3] = amount as u8;
+  4
 }
 
 fn emit_sp_signed_offset(offset: i8, exec: &mut [u8]) -> usize {
