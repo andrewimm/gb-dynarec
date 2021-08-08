@@ -25,9 +25,13 @@ impl MemoryAreas {
     for _ in 0..0x1000 {
       work_ram.push(0);
     }
+    let mut video_ram = Vec::<u8>::with_capacity(0x2000);
+    for _ in 0..0x2000 {
+      video_ram.push(0);
+    }
     Self {
       rom,
-      video_ram: vec![].into_boxed_slice(),
+      video_ram: video_ram.into_boxed_slice(),
       cart_ram: vec![].into_boxed_slice(),
       work_ram: work_ram.into_boxed_slice(),
       high_ram: vec![].into_boxed_slice(),

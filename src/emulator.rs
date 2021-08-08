@@ -2138,4 +2138,28 @@ mod tests {
     assert_eq!(core.memory.work_ram[0xfd], 0x0e);
     assert_eq!(core.memory.io.interrupt_flag.as_u8(), 0x10);
   }
+
+  #[test]
+  fn timer_interrupt() {
+    let code = vec![
+      0x31, 0xff, 0xc0, // LD SP, 0xc0ff
+      0xfb, // EI
+      0x3e, 0x04, // LD A, 0x04
+      0xea, 0xff, 0xff, // LD (0xffff), A
+      0x3e, 0x05, // LD A, 0x05
+      0xea, 0x07, 0xff, // LD (0xff07), A
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0xc3, 0x0e, 0x00, // JP 0x000e
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    for _ in 0..255 {
+      core.run_code_block();
+      assert_eq!(core.registers.get_ip(), 0x0e);
+    }
+    assert_eq!(core.memory.io.timer.get_counter(), 255);
+    core.run_code_block();
+    assert_eq!(core.memory.io.timer.get_counter(), 0);
+    assert_eq!(core.registers.get_ip(), 0x50);
+  }
 }

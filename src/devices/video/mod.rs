@@ -142,7 +142,6 @@ impl VideoState {
     let tile_row = relative_tile_line & 7;
     self.current_tile_cache = self.get_tile_row(vram, tile_index, tile_row);
     self.next_cached_tile_x += 1;
-    println!("CACHED TILE {} {} {}: {:X}", tile_x, tile_y, tile_row, self.current_tile_cache);
   }
 
   pub fn run_clock_cycles(&mut self, cycles: usize, vram: &Box<[u8]>) -> InterruptFlag {
