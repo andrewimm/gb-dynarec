@@ -34,6 +34,16 @@ impl LCD {
     &mut self.writing_buffer
   }
 
+  pub fn get_writing_buffer_readonly(&self) -> &Box<[u8]> {
+    &self.writing_buffer
+  }
+
+  pub fn get_writing_buffer_line(&mut self, line: usize) -> &mut [u8] {
+    let start = line * LCD_WIDTH;
+    let end = start + LCD_WIDTH;
+    &mut self.writing_buffer[start..end]
+  }
+
   pub fn swap_buffers(&mut self) {
     std::mem::swap(&mut self.visible_buffer, &mut self.writing_buffer);
   }

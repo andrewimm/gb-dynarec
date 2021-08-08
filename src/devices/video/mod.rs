@@ -8,12 +8,16 @@ pub struct VideoState {
   lcd: LCD,
   tile_address_offset: usize,
   first_tile_offset: usize,
+  bg_map_offset: usize,
+  window_map_offset: usize,
   lcd_control_value: u8,
   ly_compare: u8,
 
   current_mode: u8,
   current_mode_dots: usize,
   current_line: u8,
+  next_cached_tile_x: usize,
+  current_tile_cache: u16,
 }
 
 impl VideoState {
@@ -22,6 +26,8 @@ impl VideoState {
       lcd: LCD::new(),
       tile_address_offset: 0,
       first_tile_offset: 0,
+      bg_map_offset: 0x1800,
+      window_map_offset: 0x1800,
       lcd_control_value: 0,
       ly_compare: 0,
 
@@ -29,6 +35,8 @@ impl VideoState {
       current_mode: 1,
       current_mode_dots: 0,
       current_line: 144,
+      next_cached_tile_x: 0,
+      current_tile_cache: 0,
     }
   }
 
@@ -42,6 +50,16 @@ impl VideoState {
     };
     self.tile_address_offset = tile_address_offset;
     self.first_tile_offset = first_tile_offset;
+    self.bg_map_offset = if value & 0x08 == 0 {
+      0x1800
+    } else {
+      0x1c00
+    };
+    self.window_map_offset = if value & 0x40 == 0 {
+      0x1800
+    } else {
+      0x1c00
+    };
     self.lcd_control_value = value;
   }
 
@@ -97,6 +115,12 @@ impl VideoState {
       + self.tile_address_offset
   }
 
+  fn get_bg_tile(&self, x: usize, y: usize, vram: &Box<[u8]>) -> u8 {
+    let offset = x + y * 32;
+    let address = self.bg_map_offset + offset;
+    vram[address]
+  }
+
   pub fn get_tile_row(&self, video_ram: &Box<[u8]>, tile: usize, row: usize) -> u16 {
     let mut address = self.get_tile_address(tile);
     address += row * 2;
@@ -107,6 +131,18 @@ impl VideoState {
 
   fn find_current_line_sprites(&mut self) {
 
+  }
+
+  fn cache_next_tile_row(&mut self, vram: &Box<[u8]>) {
+    let tile_x = self.next_cached_tile_x;
+    // TODO: account for scroll y
+    let relative_tile_line = self.current_line as usize;
+    let tile_y = relative_tile_line >> 3;
+    let tile_index = self.get_bg_tile(tile_x, tile_y, vram) as usize;
+    let tile_row = relative_tile_line & 7;
+    self.current_tile_cache = self.get_tile_row(vram, tile_index, tile_row);
+    self.next_cached_tile_x += 1;
+    println!("CACHED TILE {} {} {}: {:X}", tile_x, tile_y, tile_row, self.current_tile_cache);
   }
 
   pub fn run_clock_cycles(&mut self, cycles: usize, vram: &Box<[u8]>) -> InterruptFlag {
@@ -162,6 +198,9 @@ impl VideoState {
           if self.current_mode_dots >= 80 {
             self.current_mode_dots -= 80;
             self.current_mode = 3;
+
+            self.next_cached_tile_x = 0;
+            self.cache_next_tile_row(vram);
           }
         },
         3 => {
@@ -172,25 +211,36 @@ impl VideoState {
           if self.current_mode_dots >= 188 {
             self.current_mode_dots -= 188;
             self.current_mode = 0;
-          }
+          } else if self.current_mode_dots < 160 {
 
-          // TODO: Account for scroll-x
-          let mut tile_x: usize = previous_dot_count & 7;
-          let mut dots_remaining: usize = 4;
-          // Shift 4 pixels out of the current tile and into the line buffer.
-          // If the end of the tile is reached, compute and cache the next tile.
-          loop {
-            while tile_x < 8 && dots_remaining > 0 {
-              // shift a pixel out of the current tile cache
+            // TODO: Account for scroll-x
+            let mut tile_x: usize = previous_dot_count & 7;
+            let mut dots_remaining: usize = 4;
+            let mut current_write_index: usize = previous_dot_count;
 
-              tile_x += 1;
-              dots_remaining -= 1;
-            }
-            if dots_remaining > 0 {
-              // load the next tile to cache
+            // Shift 4 pixels out of the current tile and into the line buffer.
+            // If the end of the tile is reached, compute and cache the next tile.
+            loop {
+              let current_line_buffer = self.lcd.get_writing_buffer_line(self.current_line as usize);
+              while tile_x < 8 && dots_remaining > 0 {
+                // shift a pixel out of the current tile cache
+                let color = (self.current_tile_cache & 3) as u8;
+                current_line_buffer[current_write_index] = color;
 
-            } else {
-              break;
+                self.current_tile_cache >>= 2;
+                tile_x += 1;
+                dots_remaining -= 1;
+                current_write_index += 1;
+              }
+              if dots_remaining > 0 {
+                // load the next tile to cache
+                self.cache_next_tile_row(vram);
+              } else {
+                if tile_x == 8 {
+                  self.cache_next_tile_row(vram);
+                }
+                break;
+              }
             }
           }
         },
@@ -199,6 +249,14 @@ impl VideoState {
     }
 
     InterruptFlag::empty()
+  }
+
+  pub fn get_writing_buffer(&self) -> &Box<[u8]> {
+    self.lcd.get_writing_buffer_readonly()
+  }
+
+  pub fn get_visible_buffer(&self) -> &Box<[u8]> {
+    self.lcd.get_visible_buffer()
   }
 }
 
@@ -220,7 +278,11 @@ mod tests {
 
   #[test]
   fn video_mode_timing() {
-    let mut vram = Vec::new().into_boxed_slice();
+    let mut vram_vec = Vec::with_capacity(0x2000);
+    for _ in 0..0x2000 {
+      vram_vec.push(0);
+    }
+    let mut vram = vram_vec.into_boxed_slice();
     let mut video = VideoState::new();
     // video state starts out in vblank
     assert_eq!(video.get_lcd_status() & 3, 1);
@@ -241,5 +303,83 @@ mod tests {
     // 376 cycles covers mode 3 and mode 0, skipping to the next line
     assert_eq!(video.get_lcd_status() & 3, 2);
     assert_eq!(video.get_ly(), 1);
+  }
+
+  #[test]
+  fn basic_bg_drawing() {
+    let mut vram_vec = Vec::with_capacity(0x2000);
+    for _ in 0..0x2000 {
+      vram_vec.push(0);
+    }
+    let mut vram = vram_vec.into_boxed_slice();
+    {
+      // make the first line of the bg a repeating pattern of the first 4 tiles
+      for i in 0..32 {
+        vram[0x1800 + i] = (i & 3) as u8;
+      }
+
+      // make the first 4 tiles different alternating lines of gray
+      for y in 0..8 {
+        vram[y * 2] = if y & 1 == 0 { 0 } else { 0xff };
+        vram[y * 2 + 1] = if y & 1 == 0 { 0 } else { 0xff };
+      }
+      for y in 0..8 {
+        vram[16 + y * 2] = if y & 1 == 0 { 0xff } else { 0 };
+        vram[16 + y * 2 + 1] = if y & 1 == 0 { 0 } else { 0xff };
+      }
+      for y in 0..8 {
+        vram[32 + y * 2] = if y & 1 == 0 { 0 } else { 0xff };
+        vram[32 + y * 2 + 1] = if y & 1 == 0 { 0xff } else { 0 };
+      }
+      for y in 0..8 {
+        vram[48 + y * 2] = if y & 1 == 0 { 0xff } else { 0 };
+        vram[48 + y * 2 + 1] = if y & 1 == 0 { 0xff } else { 0 };
+      }
+    }
+    let mut video = VideoState::new();
+    video.set_lcd_control(0x90); // enable LCD, tiles start at 0x8000
+    // get to start of first line
+    video.run_clock_cycles(456 * 10 / 4, &mut vram);
+    // draw first line
+    video.run_clock_cycles(456 / 4, &mut vram);
+    for i in 0..8 {
+      assert_eq!(video.get_writing_buffer()[i], 0);
+    }
+    for i in 8..16 {
+      assert_eq!(video.get_writing_buffer()[i], 1);
+    }
+    for i in 16..24 {
+      assert_eq!(video.get_writing_buffer()[i], 2);
+    }
+    for i in 24..32 {
+      assert_eq!(video.get_writing_buffer()[i], 3);
+    }
+    for i in 32..40 {
+      assert_eq!(video.get_writing_buffer()[i], 0);
+    }
+    for i in 40..48 {
+      assert_eq!(video.get_writing_buffer()[i], 1);
+    }
+    for i in 48..56 {
+      assert_eq!(video.get_writing_buffer()[i], 2);
+    }
+    for i in 56..64 {
+      assert_eq!(video.get_writing_buffer()[i], 3);
+    }
+
+    // draw second line
+    video.run_clock_cycles(456 / 4, &mut vram);
+    for i in 0..8 {
+      assert_eq!(video.get_writing_buffer()[160 + i], 3);
+    }
+    for i in 8..16 {
+      assert_eq!(video.get_writing_buffer()[160 + i], 2);
+    }
+    for i in 16..24 {
+      assert_eq!(video.get_writing_buffer()[160 + i], 1);
+    }
+    for i in 24..32 {
+      assert_eq!(video.get_writing_buffer()[160 + i], 0);
+    }
   }
 }
