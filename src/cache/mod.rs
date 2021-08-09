@@ -59,13 +59,43 @@ impl CodeCache {
 
     let mut block_ended = false;
     let mut index = ip;
-    while !block_ended && index < code.len() {
-      let (next_op, length, _cycles) = decode(&code[index..]);
+    while !block_ended {
+      // TODO: needs to handle MBC banking
+      let code_slice = match index {
+        0..=0x7fff => &code[index..],
+        0xa000..=0xbfff => panic!("Executing external RAM"),
+        0xc000..=0xdfff => unsafe {
+          &(*mem).work_ram[(index - 0xc000)..]
+        },
+        _ => panic!(),
+      };
+      if code_slice.len() < 1 {
+        break;
+      }
+      let (next_op, length, _cycles) = decode(code_slice);
       index += length;
       block_ended = next_op.is_block_end();
       let written = emitter.encode_op(next_op, length, &mut translated[write_cursor..]);
       write_cursor += written;
     }
+
+    
+    #[cfg(feature = "dump_disassembly")]
+    {
+      let code_slice = match ip {
+        0..=0x7fff => &code[ip..index],
+        0xc000..=0xdfff => unsafe {
+          &(*mem).work_ram[(ip - 0xc000)..(index - 0xc000)]
+        },
+        _ => panic!(),
+      };
+      let disassembly = crate::debug::disassembly::disassemble(ip as u16, code_slice);
+      for instr in disassembly.iter() {
+        println!("{}", instr);
+      }
+      println!("  ==  ");
+    }
+    
 
     write_cursor += emitter.encode_epilogue(&mut translated[write_cursor..]);
 

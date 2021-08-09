@@ -12,10 +12,10 @@ use crate::mem::MemoryAreas;
 // RBX  |  BC
 // RDX  |  DE
 // RCX  |  HL
-// R8   |  SP
-// R9   |  IP
-// R10  |  Code block return state
-// R11  |  Accumulated CPU cycles
+// R12  |  SP
+// R13  |  IP
+// R14  |  Code block return state
+// R15  |  Accumulated CPU cycles
 
 pub struct Emitter {
   mem: *const MemoryAreas,
@@ -32,17 +32,21 @@ impl Emitter {
     let code = [
       // preserve scratch registers that will be modified
       0x53, // push rbx
+      0x41, 0x54, // push r12
+      0x41, 0x55, // push r13
+      0x41, 0x56, // push r14
+      0x41, 0x57, // push r15
       // set initial return code
-      0x4d, 0x31, 0xd2, // xor r10, r10
+      0x4d, 0x31, 0xf6, // xor r14, r14
       // begin method, load all registers from a struct in memory
       // the only argument (rdi) will be a pointer to the struct
       0x8b, 0x07, // mov eax, [rdi]
       0x8b, 0x5f, 0x04, // mov ebx, [rdi + 4]
       0x8b, 0x57, 0x08, // mov edx, [rdi + 8]
       0x8b, 0x4f, 0x0c, // mov ecx, [rdi + 12]
-      0x66, 0x44, 0x8b, 0x47, 0x10, // mov r8w, [rdi + 16]
-      0x66, 0x44, 0x8b, 0x4f, 0x14, // mov r9w, [rdi + 20]
-      0x66, 0x44, 0x8b, 0x5f, 0x18, // mov r11w, [rdi + 24]
+      0x66, 0x44, 0x8b, 0x67, 0x10, // mov r12w, [rdi + 16]
+      0x66, 0x44, 0x8b, 0x6f, 0x14, // mov r13w, [rdi + 20]
+      0x66, 0x44, 0x8b, 0x7f, 0x18, // mov r15w, [rdi + 24]
       0x57, // push rdi
     ];
     let length = code.len();
@@ -58,12 +62,16 @@ impl Emitter {
       0x89, 0x5f, 0x04, // mov [rdi + 4], ebx
       0x89, 0x57, 0x08, // mov [rdi + 8], edx
       0x89, 0x4f, 0x0c, // mov [rdi + 12], ecx
-      0x66, 0x44, 0x89, 0x47, 0x10, // mov [rdi + 16], r8w
-      0x66, 0x44, 0x89, 0x4f, 0x14, // mov [rdi + 20], r9w
-      0x66, 0x44, 0x89, 0x5f, 0x18, // mov [rdi + 24], r11w
-      // Set return value from r10
-      0x4c, 0x89, 0xd0, // mov rax, r10
+      0x66, 0x44, 0x89, 0x67, 0x10, // mov [rdi + 16], r12w
+      0x66, 0x44, 0x89, 0x6f, 0x14, // mov [rdi + 20], r13w
+      0x66, 0x44, 0x89, 0x7f, 0x18, // mov [rdi + 24], r15w
+      // Set return value from r14
+      0x4c, 0x89, 0xf0, // mov rax, r14
       // Restore scratch registers to their original value
+      0x41, 0x5f, // pop r15
+      0x41, 0x5e, // pop r14
+      0x41, 0x5d, // pop r13
+      0x41, 0x5c, // pop r12
       0x5b, // pop rbx
       0xc3, // retq
     ];
@@ -773,7 +781,7 @@ impl Emitter {
         // the value of the IP directly.
         len += emit_jump_zero(4 + 5, &mut exec[len..]);
         len += emit_cycle_increment(1, &mut exec[len..]);
-        len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
+        len += emit_move_16(X86Reg16::R13, address, &mut exec[len..]);
       },
       JumpCondition::NonZero => {
         len = emit_ip_increment(3, exec);
@@ -781,7 +789,7 @@ impl Emitter {
         len += emit_flag_test(0x80, &mut exec[len..]);
         len += emit_jump_nonzero(4 + 5, &mut exec[len..]);
         len += emit_cycle_increment(1, &mut exec[len..]);
-        len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
+        len += emit_move_16(X86Reg16::R13, address, &mut exec[len..]);
       },
       JumpCondition::Carry => {
         len = emit_ip_increment(3, exec);
@@ -789,7 +797,7 @@ impl Emitter {
         len += emit_flag_test(0x10, &mut exec[len..]);
         len += emit_jump_zero(4 + 5, &mut exec[len..]);
         len += emit_cycle_increment(1, &mut exec[len..]);
-        len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
+        len += emit_move_16(X86Reg16::R13, address, &mut exec[len..]);
       },
       JumpCondition::NoCarry => {
         len = emit_ip_increment(3, exec);
@@ -797,7 +805,7 @@ impl Emitter {
         len += emit_flag_test(0x10, &mut exec[len..]);
         len += emit_jump_nonzero(4 + 5, &mut exec[len..]);
         len += emit_cycle_increment(3, &mut exec[len..]);
-        len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
+        len += emit_move_16(X86Reg16::R13, address, &mut exec[len..]);
       },
     }
     len
@@ -857,7 +865,7 @@ impl Emitter {
     match condition {
       JumpCondition::Always => {
         len = emit_ip_increment(3, exec);
-        len += emit_push(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_push(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
         len += emit_jump(address, &mut exec[len..]);
         len += emit_cycle_increment(6, &mut exec[len..]);
       },
@@ -869,9 +877,9 @@ impl Emitter {
         // the byte when the full block is written.
         len += emit_jump_zero(0, &mut exec[len..]);
         let offset_location = len;
-        len += emit_push(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_push(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
         len += emit_cycle_increment(3, &mut exec[len..]);
-        len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
+        len += emit_move_16(X86Reg16::R13, address, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
       },
@@ -881,9 +889,9 @@ impl Emitter {
         len += emit_flag_test(0x80, &mut exec[len..]);
         len += emit_jump_nonzero(0, &mut exec[len..]);
         let offset_location = len;
-        len += emit_push(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_push(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
         len += emit_cycle_increment(3, &mut exec[len..]);
-        len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
+        len += emit_move_16(X86Reg16::R13, address, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
       },
@@ -893,9 +901,9 @@ impl Emitter {
         len += emit_flag_test(0x10, &mut exec[len..]);
         len += emit_jump_zero(0, &mut exec[len..]);
         let offset_location = len;
-        len += emit_push(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_push(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
         len += emit_cycle_increment(3, &mut exec[len..]);
-        len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
+        len += emit_move_16(X86Reg16::R13, address, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
       },
@@ -905,9 +913,9 @@ impl Emitter {
         len += emit_flag_test(0x10, &mut exec[len..]);
         len += emit_jump_nonzero(0, &mut exec[len..]);
         let offset_location = len;
-        len += emit_push(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_push(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
         len += emit_cycle_increment(3, &mut exec[len..]);
-        len += emit_move_16(X86Reg16::R9, address, &mut exec[len..]);
+        len += emit_move_16(X86Reg16::R13, address, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
       },
@@ -917,7 +925,7 @@ impl Emitter {
 
   pub fn encode_reset(&self, vector: u16, exec: &mut [u8]) -> usize {
     let mut len = emit_ip_increment(1, exec);
-    len += emit_push(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+    len += emit_push(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
     len += emit_cycle_increment(4, &mut exec[len..]);
     len + emit_jump(vector, &mut exec[len..])
   }
@@ -926,7 +934,7 @@ impl Emitter {
     let mut len;
     match condition {
       JumpCondition::Always => {
-        len = emit_pop(X86Reg16::R9, self.mem as usize, exec);
+        len = emit_pop(X86Reg16::R13, self.mem as usize, exec);
         len += emit_cycle_increment(4, &mut exec[len..]);
       },
       JumpCondition::Zero => {
@@ -935,7 +943,7 @@ impl Emitter {
         len += emit_flag_test(0x80, &mut exec[len..]);
         len += emit_jump_zero(0, &mut exec[len..]);
         let offset_location = len;
-        len += emit_pop(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_pop(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
         len += emit_cycle_increment(3, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
@@ -946,7 +954,7 @@ impl Emitter {
         len += emit_flag_test(0x80, &mut exec[len..]);
         len += emit_jump_nonzero(0, &mut exec[len..]);
         let offset_location = len;
-        len += emit_pop(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_pop(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
         len += emit_cycle_increment(3, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
@@ -957,7 +965,7 @@ impl Emitter {
         len += emit_flag_test(0x10, &mut exec[len..]);
         len += emit_jump_zero(0, &mut exec[len..]);
         let offset_location = len;
-        len += emit_pop(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_pop(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
         len += emit_cycle_increment(3, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
@@ -968,7 +976,7 @@ impl Emitter {
         len += emit_flag_test(0x10, &mut exec[len..]);
         len += emit_jump_nonzero(0, &mut exec[len..]);
         let offset_location = len;
-        len += emit_pop(X86Reg16::R9, self.mem as usize, &mut exec[len..]);
+        len += emit_pop(X86Reg16::R13, self.mem as usize, &mut exec[len..]);
         len += emit_cycle_increment(3, &mut exec[len..]);
         let delta = len - offset_location;
         exec[offset_location - 1] = delta as u8;
@@ -978,7 +986,7 @@ impl Emitter {
   }
 
   pub fn encode_return_from_interrupt(&self, exec: &mut [u8]) -> usize {
-    let mut len = emit_pop(X86Reg16::R9, self.mem as usize, exec);
+    let mut len = emit_pop(X86Reg16::R13, self.mem as usize, exec);
     len += emit_cycle_increment(4, &mut exec[len..]);
     len + emit_return_code(cpu::STATUS_INTERRUPT_ENABLE, &mut exec[len..])
   }
@@ -990,8 +998,8 @@ fn emit_immediate_u16(value: u16, exec: &mut [u8]) {
 }
 
 fn emit_return_code(code: u8, exec: &mut [u8]) -> usize {
-  exec[0] = 0x41; // mov r10b, code
-  exec[1] = 0xb2;
+  exec[0] = 0x41; // mov r14b, code
+  exec[1] = 0xb6;
   exec[2] = code;
   3
 }
@@ -1004,15 +1012,15 @@ fn emit_move_16(dest: X86Reg16, value: u16, exec: &mut [u8]) -> usize {
     X86Reg16::CX => exec[pointer] = 0xb9,
     X86Reg16::DX => exec[pointer] = 0xba,
     X86Reg16::BX => exec[pointer] = 0xbb,
-    X86Reg16::R8 => {
+    X86Reg16::R12 => {
       exec[pointer] = 0x41;
       pointer += 1;
-      exec[pointer] = 0xb8;
+      exec[pointer] = 0xbc;
     },
-    X86Reg16::R9 => {
+    X86Reg16::R13 => {
       exec[pointer] = 0x41;
       pointer += 1;
-      exec[pointer] = 0xb9;
+      exec[pointer] = 0xbd;
     },
   }
   pointer += 1;
@@ -1108,18 +1116,18 @@ fn emit_add_hl(src: X86Reg16, exec: &mut [u8]) -> usize {
       exec[3] = 0xf5;
       4
     },
-    X86Reg16::R8 => {
-      // r8 is messier to deal with because we can't touch bits 8-15 directly
+    X86Reg16::R12 => {
+      // r12 is messier to deal with because we can't touch bits 8-15 directly
       let code = [
-        0x44, 0x00, 0xc1, // add cl, r8b
+        0x44, 0x00, 0xe1, // add cl, r12b
         0x9c, // pushf
         0xc1, 0xc9, 0x08, // ror ecx, 8
-        0x41, 0xc1, 0xc8, 0x08, // ror r8d, 8
+        0x41, 0xc1, 0xcc, 0x08, // ror r12d, 8
         0x9d, // popf
-        0x44, 0x10, 0xc1, // adc cl, r8b
+        0x44, 0x10, 0xe1, // adc cl, r12b
         0x9c, // pushf
         0xc1, 0xc1, 0x08, // rol ecx, 8
-        0x41, 0xc1, 0xc0, 0x08, // rol r8d, 8
+        0x41, 0xc1, 0xc4, 0x08, // rol r12d, 8
         0x9d, // popf
       ];
       let length = code.len();
@@ -1440,22 +1448,22 @@ fn emit_complement_carry(exec: &mut [u8]) -> usize {
 
 fn emit_jump(addr: u16, exec: &mut [u8]) -> usize {
   // A jump will cause the block to end
-  // To perform the jump, simply update the IP register (r9)
+  // To perform the jump, simply update the IP register (r13)
   // The emulator will stop writing instructions at a jump, and the epilogue
   // will return
   exec[0] = 0x66;
   exec[1] = 0x41;
-  exec[2] = 0xb9;
+  exec[2] = 0xbd;
   emit_immediate_u16(addr, &mut exec[3..]);
   5
 }
 
 fn emit_jump_hl(exec: &mut [u8]) -> usize {
-  // shortcut for "mov r9w, cx"
+  // shortcut for "mov r13w, cx"
   exec[0] = 0x66;
   exec[1] = 0x41;
   exec[2] = 0x89;
-  exec[3] = 0xc9;
+  exec[3] = 0xcd;
   4
 }
 
@@ -1510,35 +1518,35 @@ fn emit_ip_increment(amount: usize, exec: &mut [u8]) -> usize {
   exec[4] = amount as u8;
   5
   */
-  exec[0] = 0x49; // add r9, amount
+  exec[0] = 0x49; // add r13, amount
   exec[1] = 0x83;
-  exec[2] = 0xc1;
+  exec[2] = 0xc5;
   exec[3] = amount as u8;
   4
 }
 
 fn emit_ip_signed_offset(offset: i8, exec: &mut [u8]) -> usize {
-  exec[0] = 0x66; // add r9w, offset
+  exec[0] = 0x66; // add r13w, offset
   exec[1] = 0x41;
   exec[2] = 0x83;
-  exec[3] = 0xc1;
+  exec[3] = 0xc5;
   exec[4] = offset as u8;
   5
 }
 
 fn emit_cycle_increment(amount: usize, exec: &mut [u8]) -> usize {
-  exec[0] = 0x49; // add r11, amount
+  exec[0] = 0x49; // add r15, amount
   exec[1] = 0x83;
-  exec[2] = 0xc3;
+  exec[2] = 0xc7;
   exec[3] = amount as u8;
   4
 }
 
 fn emit_sp_signed_offset(offset: i8, exec: &mut [u8]) -> usize {
-  exec[0] = 0x66; // add r8w, offset
+  exec[0] = 0x66; // add r12w, offset
   exec[1] = 0x41;
   exec[2] = 0x83;
-  exec[3] = 0xc0;
+  exec[3] = 0xc4;
   exec[4] = offset as u8;
   5
 }
@@ -1632,16 +1640,16 @@ fn emit_daa(exec: &mut [u8]) -> usize {
 }
 
 fn emit_load_to_sp(exec: &mut [u8]) -> usize {
-  exec[0] = 0x66; // mov r8w, cx
+  exec[0] = 0x66; // mov r12w, cx
   exec[1] = 0x41;
   exec[2] = 0x89;
-  exec[3] = 0xc8;
+  exec[3] = 0xcc;
   4
 }
 
 fn emit_load_stack_offset(offset: i8, exec: &mut [u8]) -> usize {
   let code = [
-    0x66, 0x44, 0x89, 0xc1, // mov cx, r8w
+    0x66, 0x44, 0x89, 0xe1, // mov cx, r12w
     0x66, 0x83, 0xc1, offset as u8, // add cx, offset
   ];
   let length = code.len();
@@ -1815,7 +1823,7 @@ fn emit_write_stack_to_memory(exec: &mut [u8], memory_base: usize, address: u16)
       memory_pointer[5],
       memory_pointer[6],
       memory_pointer[7],
-    0x4c, 0x89, 0xc2, // mov rdx, r8
+    0x4c, 0x89, 0xe2, // mov rdx, r12
 
     0x48, 0xb8, // movabs rax, fn_pointer
       fn_pointer[0],
@@ -1998,16 +2006,16 @@ fn emit_push(source: X86Reg16, memory_base: usize, exec: &mut [u8]) -> usize {
     X86Reg16::BX => (0x89, 0xda, 0x90),
     X86Reg16::CX => (0x89, 0xca, 0x90),
     X86Reg16::DX => (0x89, 0xd2, 0x90),
-    X86Reg16::R9 => (0x44, 0x89, 0xca),
+    X86Reg16::R13 => (0x44, 0x89, 0xea),
     _ => unreachable!("Unsupported push register"),
   };
   let code = [
     0x50, // push rax
     0x51, // push rcx
     0x52, // push rdx
-    0x49, 0x83, 0xe8, 0x02, // sub r8, 2
-    0x49, 0x81, 0xe0, 0xff, 0xff, 0x00, 0x00, // and r8, 0xffff
-    0x4c, 0x89, 0xc6, // mov rsi, r8
+    0x49, 0x83, 0xec, 0x02, // sub r12, 2
+    0x49, 0x81, 0xe4, 0xff, 0xff, 0x00, 0x00, // and r12, 0xffff
+    0x4c, 0x89, 0xe6, // mov rsi, r12
     0x48, 0xbf, // movabs rdi, memory_pointer
       memory_pointer[0],
       memory_pointer[1],
@@ -2047,7 +2055,7 @@ fn emit_pop(dest: X86Reg16, memory_base: usize, exec: &mut [u8]) -> usize {
     X86Reg16::BX => 8,
     X86Reg16::CX => 24,
     X86Reg16::DX => 16,
-    X86Reg16::R9 => 0,
+    X86Reg16::R13 => 0,
     _ => unreachable!("Unsupported push register"),
   };
   let code = [
@@ -2055,10 +2063,10 @@ fn emit_pop(dest: X86Reg16, memory_base: usize, exec: &mut [u8]) -> usize {
     0x51, // push rcx
     0x52, // push rdx
     0x53, // push rbx
-    0x41, 0x51, // push r9
-    0x4c, 0x89, 0xc6, // mov rsi, r8
-    0x49, 0x83, 0xc0, 0x02, // add r8, 2
-    0x49, 0x81, 0xe0, 0xff, 0xff, 0x00, 0x00, // and r8, 0xffff
+    0x41, 0x55, // push r13
+    0x4c, 0x89, 0xe6, // mov rsi, r12
+    0x49, 0x83, 0xc4, 0x02, // add r12, 2
+    0x49, 0x81, 0xe4, 0xff, 0xff, 0x00, 0x00, // and r12, 0xffff
     0x48, 0xbf, // movabs rdi, memory_pointer
       memory_pointer[0],
       memory_pointer[1],
@@ -2080,7 +2088,7 @@ fn emit_pop(dest: X86Reg16, memory_base: usize, exec: &mut [u8]) -> usize {
     0xff, 0xd0, // call rax
     0x66, 0x89, 0x44, 0x24, stack_offset, // mov [rsp + stack_offset], ax
 
-    0x41, 0x59, // pop r9
+    0x41, 0x5d, // pop r13
     0x5b, // pop rbx
     0x5a, // pop rdx
     0x59, // pop rcx
@@ -2293,7 +2301,7 @@ fn map_register_16(gb_reg: Register16) -> X86Reg16 {
     Register16::BC => X86Reg16::BX,
     Register16::DE => X86Reg16::DX,
     Register16::HL => X86Reg16::CX,
-    Register16::SP => X86Reg16::R8,
+    Register16::SP => X86Reg16::R12,
   }
 }
 
@@ -2337,8 +2345,8 @@ enum X86Reg16 {
   BX,
   CX,
   DX,
-  R8,
-  R9,
+  R12,
+  R13,
 }
 
 enum X86Reg64 {

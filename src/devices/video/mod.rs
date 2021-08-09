@@ -210,7 +210,7 @@ impl VideoState {
           if self.current_mode_dots >= 188 {
             self.current_mode_dots -= 188;
             self.current_mode = 0;
-          } else if self.current_mode_dots < 160 {
+          } else if self.current_mode_dots < 160 && self.current_line < 144 {
 
             // TODO: Account for scroll-x
             let mut tile_x: usize = previous_dot_count & 7;
