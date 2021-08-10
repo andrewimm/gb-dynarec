@@ -15,6 +15,10 @@ use linux::ExecutableMemory;
 #[cfg(windows)]
 use self::windows::ExecutableMemory;
 
+pub const INITIAL_MEMORY_SIZE: usize = 0x8000;
+pub const MEMORY_MINIMUM_SIZE: usize = 0x1000;
+pub const MEMORY_SIZE_INCREASE: usize = 0x1000;
+
 pub struct CodeBlock {
   pub offset: usize,
   pub length: usize,
@@ -54,6 +58,7 @@ impl CodeCache {
 
     self.exec_memory.make_writable();
     let translated = self.exec_memory.get_memory_area_mut();
+    let availale_length = translated.len();
     let emitter = Emitter::new(mem);
     write_cursor += emitter.encode_prelude(&mut translated[write_cursor..]);
 
@@ -103,6 +108,11 @@ impl CodeCache {
     self.write_cursor = write_cursor;
 
     self.insert_code_block(ip, starting_offset, write_cursor - starting_offset);
+
+    let space_remaining = availale_length - write_cursor;
+    if space_remaining < MEMORY_MINIMUM_SIZE {
+      println!("Running out of space, only {} bytes left", space_remaining);
+    }
 
     starting_offset
   }

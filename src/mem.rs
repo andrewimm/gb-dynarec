@@ -124,7 +124,8 @@ pub extern "sysv64" fn memory_read_byte(areas: *const MemoryAreas, addr: u16) ->
     return memory_areas.work_ram[offset];
   }
   if addr < 0xe000 { // Work RAM Bank NN
-    return 0;
+    let offset = addr as usize & 0xfff;
+    return memory_areas.work_ram[0x1000 * memory_areas.wram_bank + offset];
   }
   if addr < 0xfe00 { // Mirror
     return 0;

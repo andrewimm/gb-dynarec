@@ -21,7 +21,7 @@ pub struct ExecutableMemory {
 
 impl ExecutableMemory {
   pub fn new() -> Self {
-    let size: usize = 4096;
+    let size: usize = super::INITIAL_MEMORY_SIZE;
     let memory_area = unsafe {
       let pointer: *mut c_void = VirtualAlloc(
         std::ptr::null_mut(),
