@@ -336,7 +336,7 @@ impl Emitter {
   pub fn encode_and_register_8(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_and_register_8(map_register_8(dest), map_register_8(src), exec);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
-    len += emit_force_flags_off(0x05, &mut exec[len..]);
+    len += emit_force_flags_off(0x50, &mut exec[len..]);
     len += emit_force_flags_on(0x20, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(1, &mut exec[len..])
@@ -347,7 +347,7 @@ impl Emitter {
     len += emit_hl_indirect_read(self.mem as usize, &mut exec[len..]);
     len += emit_and_register_8(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
-    len += emit_force_flags_off(0x05, &mut exec[len..]);
+    len += emit_force_flags_off(0x50, &mut exec[len..]);
     len += emit_force_flags_on(0x20, &mut exec[len..]);
     len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
@@ -357,7 +357,7 @@ impl Emitter {
   pub fn encode_or_register_8(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_or_register_8(map_register_8(dest), map_register_8(src), exec);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
-    len += emit_force_flags_off(0x07, &mut exec[len..]);
+    len += emit_force_flags_off(0x70, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(1, &mut exec[len..])
   }
@@ -367,7 +367,7 @@ impl Emitter {
     len += emit_hl_indirect_read(self.mem as usize, &mut exec[len..]);
     len += emit_or_register_8(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
-    len += emit_force_flags_off(0x07, &mut exec[len..]);
+    len += emit_force_flags_off(0x70, &mut exec[len..]);
     len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(2, &mut exec[len..])
@@ -376,7 +376,7 @@ impl Emitter {
   pub fn encode_xor_register_8(&self, dest: Register8, src: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_xor_register_8(map_register_8(dest), map_register_8(src), exec);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
-    len += emit_force_flags_off(0x07, &mut exec[len..]);
+    len += emit_force_flags_off(0x70, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(1, &mut exec[len..])
   }
@@ -386,7 +386,7 @@ impl Emitter {
     len += emit_hl_indirect_read(self.mem as usize, &mut exec[len..]);
     len += emit_xor_register_8(X86Reg8::AH, X86Reg8::DL, &mut exec[len..]);
     len += emit_store_flags(0x80, false, &mut exec[len..]);
-    len += emit_force_flags_off(0x07, &mut exec[len..]);
+    len += emit_force_flags_off(0x70, &mut exec[len..]);
     len += emit_pop_register(X86Reg64::RDX, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(2, &mut exec[len..])

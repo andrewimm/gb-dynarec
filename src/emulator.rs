@@ -157,6 +157,48 @@ mod tests {
   }
 
   #[test]
+  fn load_b() {
+    let code = vec![
+      0x3e, 0xaa, // LD A, 0xaa
+      0x06, 0xbb, // LD B, 0xbb
+      0x0e, 0xcc, // LD C, 0xcc
+      0x16, 0xdd, // LD D, 0xdd
+      0x1e, 0xee, // LD E, 0xee
+      0x26, 0x44, // LD H, 0x44
+      0x2e, 0x11, // LD L, 0x11
+      0x40, // LD B, B
+      0x18, 0x00, // JR 0
+      0x41, // LD B, C
+      0x18, 0x00, // JR 0
+      0x42, // LD B, D
+      0x18, 0x00, // JR 0
+      0x43, // LD B, E
+      0x18, 0x00, // JR 0
+      0x44, // LD B, H
+      0x18, 0x00, // JR 0
+      0x45, // LD B, L
+      0x18, 0x00, // JR 0
+      0x47, // LD B, A
+      0x18, 0x00, // JR 0
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0xbbcc);
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0xcccc);
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0xddcc);
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0xeecc);
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0x44cc);
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0x11cc);
+    core.run_code_block();
+    assert_eq!(core.registers.get_bc(), 0xaacc);
+  }
+
+  #[test]
   fn increment_16_bit() {
     let code = vec![
       0x03, // INC BC
