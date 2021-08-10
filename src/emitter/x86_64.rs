@@ -487,10 +487,12 @@ impl Emitter {
   }
 
   pub fn encode_rotate_left(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let xreg = map_register_8(reg);
     let mut len = emit_restore_carry(exec);
-    len += emit_rotate_left_through_carry(map_register_8(reg), &mut exec[len..]);
-    len += emit_store_flags(0x90, false, &mut exec[len..]);
-    len += emit_force_flags_off(0x60, &mut exec[len..]);
+    len += emit_rotate_left_through_carry(xreg, &mut exec[len..]);
+    len += emit_store_flags(0x10, false, &mut exec[len..]);
+    len += emit_force_flags_off(0xe0, &mut exec[len..]);
+    len += emit_zero_flag_test(xreg, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(2, &mut exec[len..])
   }
@@ -507,8 +509,8 @@ impl Emitter {
     let xreg = map_register_8(reg);
     let mut len = emit_rotate_left(xreg, exec);
     len += emit_store_flags(0x10, false, &mut exec[len..]);
+    len += emit_force_flags_off(0xe0, &mut exec[len..]);
     len += emit_zero_flag_test(xreg, &mut exec[len..]);
-    len += emit_force_flags_off(0x60, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(2, &mut exec[len..])
   }
@@ -523,10 +525,12 @@ impl Emitter {
   }
 
   pub fn encode_rotate_right(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let xreg = map_register_8(reg);
     let mut len = emit_restore_carry(exec);
-    len += emit_rotate_right_through_carry(map_register_8(reg), &mut exec[len..]);
-    len += emit_store_flags(0x90, false, &mut exec[len..]);
-    len += emit_force_flags_off(0x60, &mut exec[len..]);
+    len += emit_rotate_right_through_carry(xreg, &mut exec[len..]);
+    len += emit_store_flags(0x10, false, &mut exec[len..]);
+    len += emit_force_flags_off(0xe0, &mut exec[len..]);
+    len += emit_zero_flag_test(xreg, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(2, &mut exec[len..])
   }
@@ -540,9 +544,11 @@ impl Emitter {
   }
 
   pub fn encode_rotate_right_carry(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let mut len = emit_rotate_right(map_register_8(reg), exec);
+    let xreg = map_register_8(reg);
+    let mut len = emit_rotate_right(xreg, exec);
     len += emit_store_flags(0x10, false, &mut exec[len..]);
     len += emit_force_flags_off(0xe0, &mut exec[len..]);
+    len += emit_zero_flag_test(xreg, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(2, &mut exec[len..])
   }
@@ -836,7 +842,7 @@ impl Emitter {
         len += emit_ip_signed_offset(offset, &mut exec[len..]);
       },
       JumpCondition::Carry => {
-        len = emit_ip_increment(3, exec);
+        len = emit_ip_increment(2, exec);
         len += emit_cycle_increment(2, &mut exec[len..]);
         len += emit_flag_test(0x10, &mut exec[len..]);
         len += emit_jump_zero(4 + 5, &mut exec[len..]);
@@ -844,7 +850,7 @@ impl Emitter {
         len += emit_ip_signed_offset(offset, &mut exec[len..]);
       },
       JumpCondition::NoCarry => {
-        len = emit_ip_increment(3, exec);
+        len = emit_ip_increment(2, exec);
         len += emit_cycle_increment(2, &mut exec[len..]);
         len += emit_flag_test(0x10, &mut exec[len..]);
         len += emit_jump_nonzero(4 + 5, &mut exec[len..]);

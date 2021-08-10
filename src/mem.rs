@@ -114,10 +114,11 @@ pub extern "sysv64" fn memory_read_byte(areas: *const MemoryAreas, addr: u16) ->
     return memory_areas.rom[0x4000 * memory_areas.rom_bank + offset];
   }
   if addr < 0xa000 { // VRAM
-    return 0;
+    let offset = addr as usize & 0x1fff;
+    return memory_areas.video_ram[offset];
   }
   if addr < 0xc000 { // Cart RAM
-
+    panic!("Cart RAM not supported yet");
   }
   if addr < 0xd000 { // Work RAM Bank 0
     let offset = addr as usize & 0xfff;
@@ -160,7 +161,7 @@ pub extern "sysv64" fn memory_write_byte(areas: *mut MemoryAreas, addr: u16, val
     return;
   }
   if addr < 0xc000 { // Cart RAM
-
+    panic!("Cart RAM not supported yet");
   }
   if addr < 0xd000 { // Work RAM Bank 0
     let offset = addr as usize & 0xfff;
