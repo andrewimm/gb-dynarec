@@ -1675,8 +1675,10 @@ mod tests {
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0000);
     assert_eq!(core.registers.get_sp(), 0xc07c);
     core.run_code_block();
+    assert_eq!(core.registers.get_af(), 0x0030);
     assert_eq!(core.registers.get_sp(), 0xc07b);
   }
 

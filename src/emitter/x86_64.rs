@@ -734,8 +734,8 @@ impl Emitter {
 
   pub fn encode_add_sp(&self, offset: i8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_sp_signed_offset(offset, exec);
-    len += emit_store_flags(0x70, false, &mut exec[len..]);
-    len += emit_force_flags_off(0x80, &mut exec[len..]);
+    len += emit_store_flags(0x30, false, &mut exec[len..]);
+    len += emit_force_flags_off(0xc0, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(4, &mut exec[len..])
   }
@@ -1549,12 +1549,16 @@ fn emit_cycle_increment(amount: usize, exec: &mut [u8]) -> usize {
 }
 
 fn emit_sp_signed_offset(offset: i8, exec: &mut [u8]) -> usize {
-  exec[0] = 0x66; // add r12w, offset
-  exec[1] = 0x41;
-  exec[2] = 0x83;
-  exec[3] = 0xc4;
-  exec[4] = offset as u8;
-  5
+  // In order to ensure the carry / half-carry flags are based on the lower 8
+  // bits of SP, perform a second throwaway addition after the actual operation.
+  let code = [
+    0x44, 0x88, 0xe6, // mov sil, r12b
+    0x66, 0x41, 0x83, 0xc4, offset as u8, // add r12w, offset
+    0x40, 0x80, 0xc6, offset as u8, // add sil, offset
+  ];
+  let length = code.len();
+  exec[..length].copy_from_slice(&code);
+  length
 }
 
 fn emit_register_or(reg: X86Reg8, mask: u8, exec: &mut [u8]) -> usize {
