@@ -131,6 +131,7 @@ mod tests {
       0x1e, 0xe0, // LD E, 0xe0
       0x26, 0x11, // LD H, 0x11
       0x2e, 0x22, // LD L, 0x22
+      0x76, // HALT
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block();
@@ -138,7 +139,7 @@ mod tests {
     assert_eq!(core.registers.get_bc(), 0xb0c0);
     assert_eq!(core.registers.get_de(), 0xd0e0);
     assert_eq!(core.registers.get_hl(), 0x1122);
-    assert_eq!(core.registers.get_ip(), 14);
+    assert_eq!(core.registers.get_ip(), 15);
   }
 
   #[test]
@@ -147,13 +148,14 @@ mod tests {
       0x01, 0x22, 0x11, // LD BC, 0x1122
       0x11, 0x44, 0x33, // LD DE, 0x3344
       0x21, 0x66, 0x55, // LD HL, 0x5566
+      0x76, // HALT
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block();
     assert_eq!(core.registers.get_bc(), 0x1122);
     assert_eq!(core.registers.get_de(), 0x3344);
     assert_eq!(core.registers.get_hl(), 0x5566);
-    assert_eq!(core.registers.get_ip(), 9);
+    assert_eq!(core.registers.get_ip(), 0xa);
   }
 
   #[test]
@@ -207,13 +209,14 @@ mod tests {
       0x23, // INC HL
       0x23, // INC HL
       0x23, // INC HL
+      0x76, // HALT
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block();
     assert_eq!(core.registers.get_bc(), 1);
     assert_eq!(core.registers.get_de(), 2);
     assert_eq!(core.registers.get_hl(), 3);
-    assert_eq!(core.registers.get_ip(), 6);
+    assert_eq!(core.registers.get_ip(), 7);
   }
 
   #[test]
@@ -226,13 +229,14 @@ mod tests {
       0x1b, // DEC DE
       0x1b, // DEC DE
       0x2b, // DEC HL
+      0x76, // HALT
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block();
     assert_eq!(core.registers.get_bc(), 4);
     assert_eq!(core.registers.get_de(), 2);
     assert_eq!(core.registers.get_hl(), 7);
-    assert_eq!(core.registers.get_ip(), 13);
+    assert_eq!(core.registers.get_ip(), 14);
   }
 
   #[test]
@@ -266,6 +270,7 @@ mod tests {
       0x2c, // INC L
       0x2c, // INC L
       0x2c, // INC L
+      0x76, // HALT
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block();
@@ -273,7 +278,7 @@ mod tests {
     assert_eq!(core.registers.get_bc(), 0x0203);
     assert_eq!(core.registers.get_de(), 0x0405);
     assert_eq!(core.registers.get_hl(), 0x0607);
-    assert_eq!(core.registers.get_ip(), 28);
+    assert_eq!(core.registers.get_ip(), 29);
   }
 
   #[test]
@@ -351,6 +356,7 @@ mod tests {
       0x2d, // DEC L
       0x2d, // DEC L
       0x2d, // DEC L
+      0x76, // HALT
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block();
@@ -358,7 +364,7 @@ mod tests {
     assert_eq!(core.registers.get_bc(), 0x0302);
     assert_eq!(core.registers.get_de(), 0x0001);
     assert_eq!(core.registers.get_hl(), 0x0100);
-    assert_eq!(core.registers.get_ip(), 39);
+    assert_eq!(core.registers.get_ip(), 0x28);
   }
 
   #[test]
@@ -1925,6 +1931,7 @@ mod tests {
       0xc3, 0x07, 0x00, // JP 0x0007
       0x3e, 0x0b, // MOV A, 0x0b
       0x06, 0x10, // MOV B, 0x10
+      0x76, // HALT
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block();
@@ -1934,7 +1941,7 @@ mod tests {
     core.run_code_block();
     assert_eq!(core.registers.get_af(), 0x0a00);
     assert_eq!(core.registers.get_bc(), 0x1000);
-    assert_eq!(core.registers.get_ip(), 0x0009);
+    assert_eq!(core.registers.get_ip(), 0x000a);
   }
 
   #[test]
@@ -2183,13 +2190,14 @@ mod tests {
       0xea, 0xff, 0xff, // LD (0xffff), A
       0x3e, 0x10, // LD A, 0x10
       0xea, 0x0f, 0xff, // LD (0xff0f), A
+      0x76, // HALT
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block(); // EI will end a block
     core.run_code_block();
     assert_eq!(core.registers.get_ip(), 0x60);
     assert_eq!(core.memory.work_ram[0xfe], 0x00);
-    assert_eq!(core.memory.work_ram[0xfd], 0x0e);
+    assert_eq!(core.memory.work_ram[0xfd], 0x0f);
     assert_eq!(core.memory.io.interrupt_flag.as_u8(), 0x00);
   }
 
@@ -2202,11 +2210,12 @@ mod tests {
       0xea, 0xff, 0xff, // LD (0xffff), A
       0x3e, 0x10, // LD A, 0x10
       0xea, 0x0f, 0xff, // LD (0xff0f), A
+      0x76, // HALT
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block(); // EI will end a block
     core.run_code_block();
-    assert_eq!(core.registers.get_ip(), 0x0e);
+    assert_eq!(core.registers.get_ip(), 0x0f);
     assert_eq!(core.registers.get_sp(), 0xc0ff);
     assert_eq!(core.memory.io.interrupt_flag.as_u8(), 0x10);
   }
@@ -2220,13 +2229,14 @@ mod tests {
       0xea, 0xff, 0xff, // LD (0xffff), A
       0x3e, 0x12, // LD A, 0x12
       0xea, 0x0f, 0xff, // LD (0xff0f), A
+      0x76, // HALT
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block(); // EI will end a block
     core.run_code_block();
     assert_eq!(core.registers.get_ip(), 0x48);
     assert_eq!(core.memory.work_ram[0xfe], 0x00);
-    assert_eq!(core.memory.work_ram[0xfd], 0x0e);
+    assert_eq!(core.memory.work_ram[0xfd], 0x0f);
     assert_eq!(core.memory.io.interrupt_flag.as_u8(), 0x10);
   }
 

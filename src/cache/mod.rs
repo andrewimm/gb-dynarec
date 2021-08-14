@@ -49,17 +49,19 @@ impl CodeCache {
   pub fn get_executable_memory_segment(&self, ip: usize, mem_ptr: *const MemoryAreas) -> &[u8] {
     let mem = unsafe { &*mem_ptr };
     match ip {
-      0x0000..=0x3fff => &mem.rom[ip..],
+      0x0000..=0x3fff => &mem.rom[ip..0x4000],
       0x4000..=0x7fff => {
-        let mut offset = ip & 0x3fff;
-        offset += mem.rom_bank * 0x4000;
-        &mem.rom[offset..]
+        let bank_start = mem.rom_bank * 0x4000;
+        let bank_end = bank_start + 0x4000;
+        let offset = (ip & 0x3fff) + bank_start;
+        &mem.rom[offset..bank_end]
       },
-      0xc000..=0xcfff => &mem.work_ram[(ip & 0xfff)..],
+      0xc000..=0xcfff => &mem.work_ram[(ip & 0xfff)..0x1000],
       0xd000..=0xdfff => {
-        let mut offset = ip & 0xfff;
-        offset += mem.wram_bank * 0x1000;
-        &mem.work_ram[offset..]
+        let bank_start = mem.wram_bank * 0x1000;
+        let bank_end = bank_start + 0x1000;
+        let offset = (ip & 0xfff) + bank_start;
+        &mem.work_ram[offset..bank_end]
       },
       _ => panic!(),
     }
@@ -117,7 +119,8 @@ impl CodeCache {
     self.exec_memory.make_executable();
     self.write_cursor = write_cursor;
 
-    self.insert_code_block(ip, starting_offset, write_cursor - starting_offset);
+    let bytes_translated = index - ip;
+    self.insert_code_block(ip, starting_offset, write_cursor - starting_offset, bytes_translated);
 
     let space_remaining = available_length - write_cursor;
     if space_remaining < MEMORY_MINIMUM_SIZE {
@@ -127,7 +130,7 @@ impl CodeCache {
     starting_offset
   }
 
-  fn insert_code_block(&mut self, ip: usize, offset: usize, length: usize) {
+  fn insert_code_block(&mut self, ip: usize, offset: usize, length: usize, bytes_translated: usize) {
     let region = self.code_blocks
       .get_region_mut(ip as u16)
       .expect("Cannot cache code in this region");
@@ -136,6 +139,7 @@ impl CodeCache {
       CodeBlock {
         offset,
         length,
+        bytes_translated,
       },
     );
   }

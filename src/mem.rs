@@ -20,7 +20,17 @@ pub struct MemoryAreas {
 }
 
 impl MemoryAreas {
-  pub fn with_rom(rom: Box<[u8]>) -> Self {
+  pub fn with_rom(rom_code: Box<[u8]>) -> Self {
+    let mut rom = Vec::<u8>::with_capacity(0x4000);
+    for i in 0..0x4000 {
+      if i < rom_code.len() {
+        rom.push(rom_code[i]);
+      } else if i == rom_code.len() {
+        rom.push(0x76);
+      } else {
+        rom.push(0);
+      }
+    }
     let mut work_ram = Vec::<u8>::with_capacity(0x1000);
     for _ in 0..0x1000 {
       work_ram.push(0);
@@ -30,7 +40,7 @@ impl MemoryAreas {
       video_ram.push(0);
     }
     Self {
-      rom,
+      rom: rom.into_boxed_slice(),
       video_ram: video_ram.into_boxed_slice(),
       cart_ram: vec![].into_boxed_slice(),
       work_ram: work_ram.into_boxed_slice(),

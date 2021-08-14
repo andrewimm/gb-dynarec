@@ -95,6 +95,8 @@ impl Op {
       Op::ReturnFromInterrupt => true,
       Op::InterruptEnable => true,
       Op::InterruptDisable => true,
+      Op::Stop => true,
+      Op::Halt => true,
       _ => false,
     }
   }

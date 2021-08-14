@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 pub struct CodeBlock {
   pub offset: usize,
   pub length: usize,
+  pub bytes_translated: usize,
 }
 
 pub struct MemoryLocation {
@@ -63,6 +64,25 @@ impl CacheRegion {
     let location = MemoryLocation::new(self.current_bank, address);
     let key = location.as_u32();
     self.cache.get(&key)
+  }
+
+  pub fn invalidate(&mut self, address: u16) -> Option<CodeBlock> {
+    let location = MemoryLocation::new(self.current_bank, address);
+    let key = location.as_u32();
+    self.cache.remove(&key)
+  }
+
+  pub fn invalidate_containing(&mut self, address: u16) -> Option<CodeBlock> {
+    let mut found = None;
+    for (key, block) in self.cache.iter() {
+      let ip = MemoryLocation::from_u32(*key).address;
+      let length = block.bytes_translated as u16;
+      if address >= ip && address < ip + length {
+        found = Some(*key);
+        break;
+      }
+    }
+    found.and_then(|key| self.cache.remove(&key))
   }
 
   pub fn set_bank(&mut self, bank: u16) {
