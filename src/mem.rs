@@ -14,6 +14,9 @@ pub struct MemoryAreas {
   pub cram_bank: usize,
   pub wram_bank: usize,
 
+  pub wram_dirty: bool,
+  pub wram_dirty_flags: Box<[u64; 128]>,
+
   pub io: IO,
 
   rom_mapped: bool,
@@ -39,6 +42,9 @@ impl MemoryAreas {
     for _ in 0..0x2000 {
       video_ram.push(0);
     }
+
+    let wram_dirty_flags = Box::new([0; 128]);
+
     Self {
       rom: rom.into_boxed_slice(),
       video_ram: video_ram.into_boxed_slice(),
@@ -50,6 +56,9 @@ impl MemoryAreas {
       vram_bank: 0,
       cram_bank: 0,
       wram_bank: 1,
+
+      wram_dirty: false,
+      wram_dirty_flags,
 
       io: IO::new(),
 
@@ -79,6 +88,9 @@ impl MemoryAreas {
       vram_bank: 0,
       cram_bank: 0,
       wram_bank: 1,
+
+      wram_dirty: false,
+      wram_dirty_flags: Box::new([0; 128]),
 
       io: IO::new(),
 
@@ -176,11 +188,16 @@ pub extern "sysv64" fn memory_write_byte(areas: *mut MemoryAreas, addr: u16, val
   if addr < 0xd000 { // Work RAM Bank 0
     let offset = addr as usize & 0xfff;
     memory_areas.work_ram[offset] = value;
+    mark_wram_dirty(offset, &mut memory_areas.wram_dirty_flags);
+    memory_areas.wram_dirty = true;
     return;
   }
   if addr < 0xe000 { // Work RAM Bank NN
     let offset = addr as usize & 0xfff;
-    memory_areas.work_ram[0x1000 * memory_areas.wram_bank + offset] = value;
+    let index = 0x1000 * memory_areas.wram_bank + offset;
+    memory_areas.work_ram[index] = value;
+    mark_wram_dirty(index, &mut memory_areas.wram_dirty_flags);
+    memory_areas.wram_dirty = true;
     return;
   }
   if addr < 0xfe00 { // Mirror
@@ -216,3 +233,28 @@ pub extern "sysv64" fn memory_read_word(areas: *mut MemoryAreas, addr: u16) -> u
   let high = memory_read_byte(areas, addr + 1) as u16;
   (high << 8) | low
 }
+
+extern "sysv64" fn mark_wram_dirty(index: usize, dirty_wram: &mut [u64; 128]) {
+  let dirty_index = index / 64;
+  let dirty_offset = DIRTY_OFFSETS[index & 63];
+  dirty_wram[dirty_index] |= dirty_offset;
+}
+
+const DIRTY_OFFSETS: [u64; 64] = [
+  0x1, 0x2, 0x4, 0x8,
+  0x10, 0x20, 0x40, 0x80,
+  0x100, 0x200, 0x400, 0x800,
+  0x1000, 0x2000, 0x4000, 0x8000,
+  0x10000, 0x20000, 0x40000, 0x80000,
+  0x100000, 0x200000, 0x400000, 0x800000,
+  0x1000000, 0x2000000, 0x4000000, 0x8000000,
+  0x10000000, 0x20000000, 0x40000000, 0x80000000,
+  0x100000000, 0x200000000, 0x400000000, 0x800000000,
+  0x1000000000, 0x2000000000, 0x4000000000, 0x8000000000,
+  0x10000000000, 0x20000000000, 0x40000000000, 0x80000000000,
+  0x100000000000, 0x200000000000, 0x400000000000, 0x800000000000,
+  0x1000000000000, 0x2000000000000, 0x4000000000000, 0x8000000000000,
+  0x10000000000000, 0x20000000000000, 0x40000000000000, 0x80000000000000,
+  0x100000000000000, 0x200000000000000, 0x400000000000000, 0x800000000000000,
+  0x1000000000000000, 0x2000000000000000, 0x4000000000000000, 0x8000000000000000,
+];

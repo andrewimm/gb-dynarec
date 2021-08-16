@@ -15,7 +15,7 @@ use linux::ExecutableMemory;
 #[cfg(windows)]
 use self::windows::ExecutableMemory;
 
-pub const INITIAL_MEMORY_SIZE: usize = 0x10000;
+pub const INITIAL_MEMORY_SIZE: usize = 0x400000;
 pub const MEMORY_MINIMUM_SIZE: usize = 0x1000;
 pub const MEMORY_SIZE_INCREASE: usize = 0x1000;
 
@@ -150,5 +150,29 @@ impl CodeCache {
       std::mem::transmute(func_pointer)
     };
     func(registers as *const Registers)
+  }
+
+  pub fn invalidate_dirty_wram(&mut self, dirty_flags: &[u64; 128]) {
+    // this is incredibly, stupidly inefficient
+    // a faster method would be to iterate over all cached ranges,
+    // turn them into a series of bitmaps, and AND them with the dirty bitmaps
+    // to see if there's any overlap
+    for i in 0..128 {
+      let mut entry = dirty_flags[i];
+      if entry != 0 {
+        let mut addr = 0xc000 + (i as u16) * 64;
+        for _ in 0..64 {
+          if entry & 1 != 0 {
+            if i < 64 {
+              self.code_blocks.wram_low.invalidate_containing(addr);
+            } else {
+              self.code_blocks.wram_high.invalidate_containing(addr);
+            }
+          }
+          addr += 1;
+          entry >>= 1;
+        }
+      }
+    }
   }
 }

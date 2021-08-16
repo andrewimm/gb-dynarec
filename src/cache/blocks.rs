@@ -95,10 +95,10 @@ impl CacheRegion {
 pub struct CachedBlocks {
   rom_low: CacheRegion,   // 0x0000 - 0x3fff
   rom_high: CacheRegion,  // 0x3fff - 0x7fff
-  cart_ram: CacheRegion,  // 0xa000 - 0xbfff
-  wram_low: CacheRegion,  // 0xc000 - 0xcfff
-  wram_high: CacheRegion, // 0xd000 - 0xdfff
-  high_ram: CacheRegion,  // 0xff80 - 0xfffe
+  pub cart_ram: CacheRegion,  // 0xa000 - 0xbfff
+  pub wram_low: CacheRegion,  // 0xc000 - 0xcfff
+  pub wram_high: CacheRegion, // 0xd000 - 0xdfff
+  pub high_ram: CacheRegion,  // 0xff80 - 0xfffe
 }
 
 impl CachedBlocks {

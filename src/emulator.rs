@@ -113,6 +113,17 @@ impl Core {
     // catch up memmapped devices
     self.memory.run_clock_cycles(cycles_consumed);
     self.handle_interrupt();
+
+    if self.memory.wram_dirty {
+      // may need to invalidate a cache block
+      self.cache.invalidate_dirty_wram(&self.memory.wram_dirty_flags);
+
+      // clear all dirty flags
+      for i in 0..64 {
+        self.memory.wram_dirty_flags[i] = 0;
+      }
+      self.memory.wram_dirty = false;
+    }
     //println!("[{}] {:?}", result, self.registers);
   }
 }
