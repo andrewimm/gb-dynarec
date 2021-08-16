@@ -432,7 +432,8 @@ impl Emitter {
   }
 
   pub fn encode_sbc_absolute_8(&self, value: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
-    let mut len = emit_sbc_absolute_8(value, exec);
+    let mut len = emit_restore_carry(exec);
+    len += emit_sbc_absolute_8(value, &mut exec[len..]);
     len += emit_store_flags(0xf0, true, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(2, &mut exec[len..])
@@ -1145,28 +1146,28 @@ fn emit_add_hl(src: X86Reg16, exec: &mut [u8]) -> usize {
 }
 
 fn emit_add_absolute_8(value: u8, exec: &mut [u8]) -> usize {
-  exec[0] = 0x80;
+  exec[0] = 0x80; // add ah, value
   exec[1] = 0xc4;
   exec[2] = value;
   3
 }
 
 fn emit_adc_absolute_8(value: u8, exec: &mut [u8]) -> usize {
-  exec[0] = 0x80;
+  exec[0] = 0x80; // adc ah, value
   exec[1] = 0xd4;
   exec[2] = value;
   3
 }
 
 fn emit_sub_absolute_8(value: u8, exec: &mut [u8]) -> usize {
-  exec[0] = 0x80;
+  exec[0] = 0x80; // sub ah, value
   exec[1] = 0xec;
   exec[2] = value;
   3
 }
 
 fn emit_sbc_absolute_8(value: u8, exec: &mut [u8]) -> usize {
-  exec[0] = 0x80;
+  exec[0] = 0x80; // sbb ah, value
   exec[1] = 0xdc;
   exec[2] = value;
   3

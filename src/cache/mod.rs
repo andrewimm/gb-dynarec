@@ -63,7 +63,7 @@ impl CodeCache {
         let offset = (ip & 0xfff) + bank_start;
         &mem.work_ram[offset..bank_end]
       },
-      _ => panic!(),
+      _ => panic!("TRIED TO EXECUTE {:X}", ip),
     }
   }
 
