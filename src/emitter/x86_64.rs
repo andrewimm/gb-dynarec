@@ -1496,7 +1496,7 @@ fn emit_bit_test(reg: X86Reg8, mask: u8, exec: &mut [u8]) -> usize {
     0xf6, reg_to_test, mask, // test reg, mask
     0x41, 0x0f, 0x94, 0xc6, // setz sil
     0x41, 0xd0, 0xce, // ror sil
-    0x24, 0x00, // and al, 0x00 ; clear negative flag
+    0x24, 0x10, // and al, 0x10 ; clear all but carry flag
     0x0c, 0x20, // or al, 0x20 ; and set half-carry flag?
     0x44, 0x08, 0xf0, // or al, sil
   ];
