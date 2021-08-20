@@ -1670,7 +1670,7 @@ mod tests {
       core.run_code_block();
       assert_eq!(core.registers.get_af(), 0x9050);
     }
-    {// add, adjust to zero
+    { // add, adjust to zero
       let code = vec![
         0xc6, 0x85, // ADD A, 0x85
         0xc6, 0x15, // ADD A, 0x15
@@ -1679,6 +1679,32 @@ mod tests {
       let mut core = Core::with_code_block(code.into_boxed_slice());
       core.run_code_block();
       assert_eq!(core.registers.get_af(), 0x0090);
+    }
+    { // subtract leads to zero
+      let code = vec![
+        0xc6, 0x50, // ADD 0x50
+        0xd6, 0x50, // SUB 0x50
+        0x27, // DAA
+      ];
+      let mut core = Core::with_code_block(code.into_boxed_slice());
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0x00c0);
+    }
+    { // invalid BCD subtract does nothing
+      let code = vec![
+        0xc6, 0x5b, // ADD 0x5b
+        0xd6, 0x01, // SUB 0x01
+        0x27, // DAA
+        0x18, 0x00, // JR 0
+        0xc6, 0x80, // ADD 0x80
+        0xd6, 0x10, // SUB 0x10
+        0x27, // DAA
+      ];
+      let mut core = Core::with_code_block(code.into_boxed_slice());
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0x5a40);
+      core.run_code_block();
+      assert_eq!(core.registers.get_af(), 0xca40);
     }
   }
 
