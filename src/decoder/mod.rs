@@ -458,7 +458,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x03 => (Op::RotateLeftCarry(Register8::E), 2, 8),
     0x04 => (Op::RotateLeftCarry(Register8::H), 2, 8),
     0x05 => (Op::RotateLeftCarry(Register8::L), 2, 8),
-
+    0x06 => (Op::RotateLeftCarryIndirect, 2, 16),
     0x07 => (Op::RotateLeftCarry(Register8::A), 2, 8),
     0x08 => (Op::RotateRightCarry(Register8::B), 2, 8),
     0x09 => (Op::RotateRightCarry(Register8::C), 2, 8),
@@ -466,7 +466,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x0b => (Op::RotateRightCarry(Register8::E), 2, 8),
     0x0c => (Op::RotateRightCarry(Register8::H), 2, 8),
     0x0d => (Op::RotateRightCarry(Register8::L), 2, 8),
-
+    0x0e => (Op::RotateRightCarryIndirect, 2, 16),
     0x0f => (Op::RotateRightCarry(Register8::A), 2, 8),
 
     0x10 => (Op::RotateLeft(Register8::B), 2, 8),
@@ -475,7 +475,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x13 => (Op::RotateLeft(Register8::E), 2, 8),
     0x14 => (Op::RotateLeft(Register8::H), 2, 8),
     0x15 => (Op::RotateLeft(Register8::L), 2, 8),
-
+    0x16 => (Op::RotateLeftIndirect, 2, 16),
     0x17 => (Op::RotateLeft(Register8::A), 2, 8),
     0x18 => (Op::RotateRight(Register8::B), 2, 8),
     0x19 => (Op::RotateRight(Register8::C), 2, 8),
@@ -483,7 +483,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x1b => (Op::RotateRight(Register8::E), 2, 8),
     0x1c => (Op::RotateRight(Register8::H), 2, 8),
     0x1d => (Op::RotateRight(Register8::L), 2, 8),
-
+    0x1e => (Op::RotateRightIndirect, 2, 16),
     0x1f => (Op::RotateRight(Register8::A), 2, 8),
 
     0x20 => (Op::ShiftLeft(Register8::B), 2, 8),
@@ -509,7 +509,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x33 => (Op::Swap(Register8::E), 2, 8),
     0x34 => (Op::Swap(Register8::H), 2, 8),
     0x35 => (Op::Swap(Register8::L), 2, 8),
-
+    0x36 => (Op::SwapIndirect, 2, 16),
     0x37 => (Op::Swap(Register8::A), 2, 8),
     0x38 => (Op::ShiftRightLogical(Register8::B), 2, 8),
     0x39 => (Op::ShiftRightLogical(Register8::C), 2, 8),
@@ -526,7 +526,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x43 => (Op::BitTest(Register8::E, 0x01), 2, 8),
     0x44 => (Op::BitTest(Register8::H, 0x01), 2, 8),
     0x45 => (Op::BitTest(Register8::L, 0x01), 2, 8),
-
+    0x46 => (Op::BitTestIndirect(0x01), 2, 16),
     0x47 => (Op::BitTest(Register8::A, 0x01), 2, 8),
     0x48 => (Op::BitTest(Register8::B, 0x02), 2, 8),
     0x49 => (Op::BitTest(Register8::C, 0x02), 2, 8),
@@ -534,7 +534,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x4b => (Op::BitTest(Register8::E, 0x02), 2, 8),
     0x4c => (Op::BitTest(Register8::H, 0x02), 2, 8),
     0x4d => (Op::BitTest(Register8::L, 0x02), 2, 8),
-
+    0x4e => (Op::BitTestIndirect(0x02), 2, 16),
     0x4f => (Op::BitTest(Register8::A, 0x02), 2, 8),
 
     0x50 => (Op::BitTest(Register8::B, 0x04), 2, 8),
@@ -543,7 +543,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x53 => (Op::BitTest(Register8::E, 0x04), 2, 8),
     0x54 => (Op::BitTest(Register8::H, 0x04), 2, 8),
     0x55 => (Op::BitTest(Register8::L, 0x04), 2, 8),
-
+    0x56 => (Op::BitTestIndirect(0x04), 2, 16),
     0x57 => (Op::BitTest(Register8::A, 0x04), 2, 8),
     0x58 => (Op::BitTest(Register8::B, 0x08), 2, 8),
     0x59 => (Op::BitTest(Register8::C, 0x08), 2, 8),
@@ -551,7 +551,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x5b => (Op::BitTest(Register8::E, 0x08), 2, 8),
     0x5c => (Op::BitTest(Register8::H, 0x08), 2, 8),
     0x5d => (Op::BitTest(Register8::L, 0x08), 2, 8),
-
+    0x5e => (Op::BitTestIndirect(0x08), 2, 16),
     0x5f => (Op::BitTest(Register8::A, 0x08), 2, 8),
 
     0x60 => (Op::BitTest(Register8::B, 0x10), 2, 8),
@@ -560,7 +560,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x63 => (Op::BitTest(Register8::E, 0x10), 2, 8),
     0x64 => (Op::BitTest(Register8::H, 0x10), 2, 8),
     0x65 => (Op::BitTest(Register8::L, 0x10), 2, 8),
-
+    0x66 => (Op::BitTestIndirect(0x10), 2, 16),
     0x67 => (Op::BitTest(Register8::A, 0x10), 2, 8),
     0x68 => (Op::BitTest(Register8::B, 0x20), 2, 8),
     0x69 => (Op::BitTest(Register8::C, 0x20), 2, 8),
@@ -568,7 +568,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x6b => (Op::BitTest(Register8::E, 0x20), 2, 8),
     0x6c => (Op::BitTest(Register8::H, 0x20), 2, 8),
     0x6d => (Op::BitTest(Register8::L, 0x20), 2, 8),
-
+    0x6e => (Op::BitTestIndirect(0x20), 2, 16),
     0x6f => (Op::BitTest(Register8::A, 0x20), 2, 8),
 
     0x70 => (Op::BitTest(Register8::B, 0x40), 2, 8),
@@ -577,7 +577,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x73 => (Op::BitTest(Register8::E, 0x40), 2, 8),
     0x74 => (Op::BitTest(Register8::H, 0x40), 2, 8),
     0x75 => (Op::BitTest(Register8::L, 0x40), 2, 8),
-
+    0x76 => (Op::BitTestIndirect(0x40), 2, 16),
     0x77 => (Op::BitTest(Register8::A, 0x40), 2, 8),
     0x78 => (Op::BitTest(Register8::B, 0x80), 2, 8),
     0x79 => (Op::BitTest(Register8::C, 0x80), 2, 8),
@@ -585,7 +585,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x7b => (Op::BitTest(Register8::E, 0x80), 2, 8),
     0x7c => (Op::BitTest(Register8::H, 0x80), 2, 8),
     0x7d => (Op::BitTest(Register8::L, 0x80), 2, 8),
-
+    0x7e => (Op::BitTestIndirect(0x80), 2, 16),
     0x7f => (Op::BitTest(Register8::A, 0x80), 2, 8),
 
     0x80 => (Op::BitClear(Register8::B, 0x01), 2, 8),
@@ -594,7 +594,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x83 => (Op::BitClear(Register8::E, 0x01), 2, 8),
     0x84 => (Op::BitClear(Register8::H, 0x01), 2, 8),
     0x85 => (Op::BitClear(Register8::L, 0x01), 2, 8),
-
+    0x86 => (Op::BitClearIndirect(0x01), 2, 16),
     0x87 => (Op::BitClear(Register8::A, 0x01), 2, 8),
     0x88 => (Op::BitClear(Register8::B, 0x02), 2, 8),
     0x89 => (Op::BitClear(Register8::C, 0x02), 2, 8),
@@ -602,7 +602,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x8b => (Op::BitClear(Register8::E, 0x02), 2, 8),
     0x8c => (Op::BitClear(Register8::H, 0x02), 2, 8),
     0x8d => (Op::BitClear(Register8::L, 0x02), 2, 8),
-
+    0x8e => (Op::BitClearIndirect(0x02), 2, 16),
     0x8f => (Op::BitClear(Register8::A, 0x02), 2, 8),
 
     0x90 => (Op::BitClear(Register8::B, 0x04), 2, 8),
@@ -611,7 +611,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x93 => (Op::BitClear(Register8::E, 0x04), 2, 8),
     0x94 => (Op::BitClear(Register8::H, 0x04), 2, 8),
     0x95 => (Op::BitClear(Register8::L, 0x04), 2, 8),
-
+    0x96 => (Op::BitClearIndirect(0x04), 2, 16),
     0x97 => (Op::BitClear(Register8::A, 0x04), 2, 8),
     0x98 => (Op::BitClear(Register8::B, 0x08), 2, 8),
     0x99 => (Op::BitClear(Register8::C, 0x08), 2, 8),
@@ -619,7 +619,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x9b => (Op::BitClear(Register8::E, 0x08), 2, 8),
     0x9c => (Op::BitClear(Register8::H, 0x08), 2, 8),
     0x9d => (Op::BitClear(Register8::L, 0x08), 2, 8),
-
+    0x9e => (Op::BitClearIndirect(0x08), 2, 16),
     0x9f => (Op::BitClear(Register8::A, 0x08), 2, 8),
 
     0xa0 => (Op::BitClear(Register8::B, 0x10), 2, 8),
@@ -628,7 +628,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0xa3 => (Op::BitClear(Register8::E, 0x10), 2, 8),
     0xa4 => (Op::BitClear(Register8::H, 0x10), 2, 8),
     0xa5 => (Op::BitClear(Register8::L, 0x10), 2, 8),
-
+    0xa6 => (Op::BitClearIndirect(0x10), 2, 16),
     0xa7 => (Op::BitClear(Register8::A, 0x10), 2, 8),
     0xa8 => (Op::BitClear(Register8::B, 0x20), 2, 8),
     0xa9 => (Op::BitClear(Register8::C, 0x20), 2, 8),
@@ -636,7 +636,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0xab => (Op::BitClear(Register8::E, 0x20), 2, 8),
     0xac => (Op::BitClear(Register8::H, 0x20), 2, 8),
     0xad => (Op::BitClear(Register8::L, 0x20), 2, 8),
-
+    0xae => (Op::BitClearIndirect(0x20), 2, 16),
     0xaf => (Op::BitClear(Register8::A, 0x20), 2, 8),
 
     0xb0 => (Op::BitClear(Register8::B, 0x40), 2, 8),
@@ -645,7 +645,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0xb3 => (Op::BitClear(Register8::E, 0x40), 2, 8),
     0xb4 => (Op::BitClear(Register8::H, 0x40), 2, 8),
     0xb5 => (Op::BitClear(Register8::L, 0x40), 2, 8),
-
+    0xb6 => (Op::BitClearIndirect(0x40), 2, 16),
     0xb7 => (Op::BitClear(Register8::A, 0x40), 2, 8),
     0xb8 => (Op::BitClear(Register8::B, 0x80), 2, 8),
     0xb9 => (Op::BitClear(Register8::C, 0x80), 2, 8),
@@ -653,7 +653,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0xbb => (Op::BitClear(Register8::E, 0x80), 2, 8),
     0xbc => (Op::BitClear(Register8::H, 0x80), 2, 8),
     0xbd => (Op::BitClear(Register8::L, 0x80), 2, 8),
-
+    0xbe => (Op::BitClearIndirect(0x80), 2, 16),
     0xbf => (Op::BitClear(Register8::A, 0x80), 2, 8),
 
     0xc0 => (Op::BitSet(Register8::B, 0x01), 2, 8),
@@ -662,7 +662,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0xc3 => (Op::BitSet(Register8::E, 0x01), 2, 8),
     0xc4 => (Op::BitSet(Register8::H, 0x01), 2, 8),
     0xc5 => (Op::BitSet(Register8::L, 0x01), 2, 8),
-
+    0xc6 => (Op::BitSetIndirect(0x01), 2, 16),
     0xc7 => (Op::BitSet(Register8::A, 0x01), 2, 8),
     0xc8 => (Op::BitSet(Register8::B, 0x02), 2, 8),
     0xc9 => (Op::BitSet(Register8::C, 0x02), 2, 8),
@@ -670,7 +670,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0xcb => (Op::BitSet(Register8::E, 0x02), 2, 8),
     0xcc => (Op::BitSet(Register8::H, 0x02), 2, 8),
     0xcd => (Op::BitSet(Register8::L, 0x02), 2, 8),
-
+    0xce => (Op::BitSetIndirect(0x02), 2, 16),
     0xcf => (Op::BitSet(Register8::A, 0x02), 2, 8),
 
     0xd0 => (Op::BitSet(Register8::B, 0x04), 2, 8),
@@ -679,7 +679,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0xd3 => (Op::BitSet(Register8::E, 0x04), 2, 8),
     0xd4 => (Op::BitSet(Register8::H, 0x04), 2, 8),
     0xd5 => (Op::BitSet(Register8::L, 0x04), 2, 8),
-
+    0xd6 => (Op::BitSetIndirect(0x04), 2, 16),
     0xd7 => (Op::BitSet(Register8::A, 0x04), 2, 8),
     0xd8 => (Op::BitSet(Register8::B, 0x08), 2, 8),
     0xd9 => (Op::BitSet(Register8::C, 0x08), 2, 8),
@@ -687,7 +687,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0xdb => (Op::BitSet(Register8::E, 0x08), 2, 8),
     0xdc => (Op::BitSet(Register8::H, 0x08), 2, 8),
     0xdd => (Op::BitSet(Register8::L, 0x08), 2, 8),
-
+    0xde => (Op::BitSetIndirect(0x08), 2, 16),
     0xdf => (Op::BitSet(Register8::A, 0x08), 2, 8),
 
     0xe0 => (Op::BitSet(Register8::B, 0x10), 2, 8),
@@ -696,7 +696,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0xe3 => (Op::BitSet(Register8::E, 0x10), 2, 8),
     0xe4 => (Op::BitSet(Register8::H, 0x10), 2, 8),
     0xe5 => (Op::BitSet(Register8::L, 0x10), 2, 8),
-
+    0xe6 => (Op::BitSetIndirect(0x10), 2, 16),
     0xe7 => (Op::BitSet(Register8::A, 0x10), 2, 8),
     0xe8 => (Op::BitSet(Register8::B, 0x20), 2, 8),
     0xe9 => (Op::BitSet(Register8::C, 0x20), 2, 8),
@@ -704,7 +704,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0xeb => (Op::BitSet(Register8::E, 0x20), 2, 8),
     0xec => (Op::BitSet(Register8::H, 0x20), 2, 8),
     0xed => (Op::BitSet(Register8::L, 0x20), 2, 8),
-
+    0xee => (Op::BitSetIndirect(0x20), 2, 16),
     0xef => (Op::BitSet(Register8::A, 0x20), 2, 8),
 
     0xf0 => (Op::BitSet(Register8::B, 0x40), 2, 8),
@@ -713,7 +713,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0xf3 => (Op::BitSet(Register8::E, 0x40), 2, 8),
     0xf4 => (Op::BitSet(Register8::H, 0x40), 2, 8),
     0xf5 => (Op::BitSet(Register8::L, 0x40), 2, 8),
-
+    0xf6 => (Op::BitSetIndirect(0x40), 2, 16),
     0xf7 => (Op::BitSet(Register8::A, 0x40), 2, 8),
     0xf8 => (Op::BitSet(Register8::B, 0x80), 2, 8),
     0xf9 => (Op::BitSet(Register8::C, 0x80), 2, 8),
@@ -721,7 +721,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0xfb => (Op::BitSet(Register8::E, 0x80), 2, 8),
     0xfc => (Op::BitSet(Register8::H, 0x80), 2, 8),
     0xfd => (Op::BitSet(Register8::L, 0x80), 2, 8),
-
+    0xfe => (Op::BitSetIndirect(0x80), 2, 16),
     0xff => (Op::BitSet(Register8::A, 0x80), 2, 8),
 
     _ => panic!("Unsupported CB Op: {:X}", instructions[0]),

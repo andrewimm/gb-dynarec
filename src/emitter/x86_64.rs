@@ -123,11 +123,15 @@ impl Emitter {
       Op::RotateLeftA => self.encode_rotate_left_a(ip_increment, exec),
       Op::RotateLeftCarryA => self.encode_rotate_left_carry_a(ip_increment, exec),
       Op::RotateLeft(reg) => self.encode_rotate_left(reg, ip_increment, exec),
+      Op::RotateLeftIndirect => self.encode_rotate_left_indirect(ip_increment, exec),
       Op::RotateLeftCarry(reg) => self.encode_rotate_left_carry(reg, ip_increment, exec),
+      Op::RotateLeftCarryIndirect => self.encode_rotate_left_carry_indirect(ip_increment, exec),
       Op::RotateRightA => self.encode_rotate_right_a(ip_increment, exec),
       Op::RotateRightCarryA => self.encode_rotate_right_carry_a(ip_increment, exec),
       Op::RotateRight(reg) => self.encode_rotate_right(reg, ip_increment, exec),
+      Op::RotateRightIndirect => self.encode_rotate_right_indirect(ip_increment, exec),
       Op::RotateRightCarry(reg) => self.encode_rotate_right_carry(reg, ip_increment, exec),
+      Op::RotateRightCarryIndirect => self.encode_rotate_right_carry_indirect(ip_increment, exec),
       Op::ShiftLeft(reg) => self.encode_shift_left(reg, ip_increment, exec),
       Op::ShiftLeftIndirect => self.encode_shift_left_indirect(ip_increment, exec),
       Op::ShiftRight(reg) => self.encode_shift_right(reg, ip_increment, exec),
@@ -138,9 +142,13 @@ impl Emitter {
       Op::SetCarryFlag => self.encode_set_carry(ip_increment, exec),
       Op::ComplementCarryFlag => self.encode_complement_carry(ip_increment, exec),
       Op::BitSet(reg, mask) => self.encode_bit_set(reg, mask, ip_increment, exec),
+      Op::BitSetIndirect(mask) => self.encode_bit_set_indirect(mask, ip_increment, exec),
       Op::BitClear(reg, mask) => self.encode_bit_clear(reg, mask, ip_increment, exec),
+      Op::BitClearIndirect(mask) => self.encode_bit_clear_indirect(mask, ip_increment, exec),
       Op::BitTest(reg, mask) => self.encode_bit_test(reg, mask, ip_increment, exec),
+      Op::BitTestIndirect(mask) => self.encode_bit_test_indirect(mask, ip_increment, exec),
       Op::Swap(reg) => self.encode_swap(reg, ip_increment, exec),
+      Op::SwapIndirect => self.encode_swap_indirect(ip_increment, exec),
       Op::LoadStackPointerToMemory(addr) => self.encode_load_stack_to_memory(addr, ip_increment, exec),
       Op::LoadAToMemory(addr) => self.encode_load_a_to_memory(addr, ip_increment, exec),
       Op::LoadAFromMemory(addr) => self.encode_load_a_from_memory(addr, ip_increment, exec),
@@ -498,6 +506,18 @@ impl Emitter {
     len + emit_cycle_increment(2, &mut exec[len..])
   }
 
+  pub fn encode_rotate_left_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_hl_indirect_partial_read(self.mem as usize, exec);
+    len += emit_restore_carry(&mut exec[len..]);
+    len += emit_rotate_left_through_carry(X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0x10, false, &mut exec[len..]);
+    len += emit_force_flags_off(0xe0, &mut exec[len..]);
+    len += emit_zero_flag_test(X86Reg8::DL, &mut exec[len..]);
+    len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(4, &mut exec[len..])
+  }
+
   pub fn encode_rotate_left_carry_a(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_rotate_left(X86Reg8::AH, exec);
     len += emit_store_flags(0x10, false, &mut exec[len..]);
@@ -514,6 +534,17 @@ impl Emitter {
     len += emit_zero_flag_test(xreg, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(2, &mut exec[len..])
+  }
+
+  pub fn encode_rotate_left_carry_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_hl_indirect_partial_read(self.mem as usize, exec);
+    len += emit_rotate_left(X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0x10, false, &mut exec[len..]);
+    len += emit_force_flags_off(0xe0, &mut exec[len..]);
+    len += emit_zero_flag_test(X86Reg8::DL, &mut exec[len..]);
+    len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(4, &mut exec[len..])
   }
 
   pub fn encode_rotate_right_a(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -536,6 +567,18 @@ impl Emitter {
     len + emit_cycle_increment(2, &mut exec[len..])
   }
 
+  pub fn encode_rotate_right_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_hl_indirect_partial_read(self.mem as usize, exec);
+    len += emit_restore_carry(&mut exec[len..]);
+    len += emit_rotate_right_through_carry(X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0x10, false, &mut exec[len..]);
+    len += emit_force_flags_off(0xe0, &mut exec[len..]);
+    len += emit_zero_flag_test(X86Reg8::DL, &mut exec[len..]);
+    len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(4, &mut exec[len..])
+  }
+
   pub fn encode_rotate_right_carry_a(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_rotate_right(X86Reg8::AH, exec);
     len += emit_store_flags(0x10, false, &mut exec[len..]);
@@ -552,6 +595,17 @@ impl Emitter {
     len += emit_zero_flag_test(xreg, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(2, &mut exec[len..])
+  }
+
+  pub fn encode_rotate_right_carry_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_hl_indirect_partial_read(self.mem as usize, exec);
+    len += emit_rotate_right(X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0x10, false, &mut exec[len..]);
+    len += emit_force_flags_off(0xe0, &mut exec[len..]);
+    len += emit_zero_flag_test(X86Reg8::DL, &mut exec[len..]);
+    len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(4, &mut exec[len..])
   }
 
   pub fn encode_shift_left(&self, reg: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {
@@ -635,14 +689,38 @@ impl Emitter {
     len + emit_cycle_increment(2, &mut exec[len..])
   }
 
+  pub fn encode_bit_set_indirect(&self, mask: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_hl_indirect_partial_read(self.mem as usize, exec);
+    len += emit_register_or(X86Reg8::DL, mask, &mut exec[len..]);
+    len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
+  }
+
   pub fn encode_bit_clear(&self, reg: Register8, mask: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_register_and(map_register_8(reg), !mask, exec);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(2, &mut exec[len..])
   }
 
+  pub fn encode_bit_clear_indirect(&self, mask: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_hl_indirect_partial_read(self.mem as usize, exec);
+    len += emit_register_and(X86Reg8::DL, !mask, &mut exec[len..]);
+    len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
+  }
+
   pub fn encode_bit_test(&self, reg: Register8, mask: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_bit_test(map_register_8(reg), mask, exec); 
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(2, &mut exec[len..])
+  }
+
+  pub fn encode_bit_test_indirect(&self, mask: u8, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_hl_indirect_partial_read(self.mem as usize, exec);
+    len += emit_bit_test(X86Reg8::DL, mask, &mut exec[len..]);
+    len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(2, &mut exec[len..])
   }
@@ -655,6 +733,17 @@ impl Emitter {
     len += emit_force_flags_off(0x70, &mut exec[len..]);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
     len + emit_cycle_increment(2, &mut exec[len..])
+  }
+
+  pub fn encode_swap_indirect(&self, ip_increment: usize, exec: &mut [u8]) -> usize {
+    let mut len = emit_hl_indirect_partial_read(self.mem as usize, exec);
+    len += emit_swap(X86Reg8::DL, &mut exec[len..]);
+    len += emit_or_register_8(X86Reg8::DL, X86Reg8::DL, &mut exec[len..]);
+    len += emit_store_flags(0x80, false, &mut exec[len..]);
+    len += emit_force_flags_off(0x70, &mut exec[len..]);
+    len += emit_hl_indirect_partial_write(self.mem as usize, &mut exec[len..]);
+    len += emit_ip_increment(ip_increment, &mut exec[len..]);
+    len + emit_cycle_increment(4, &mut exec[len..])
   }
 
   pub fn encode_load_to_indirect(&self, location: IndirectLocation, value: Register8, ip_increment: usize, exec: &mut [u8]) -> usize {

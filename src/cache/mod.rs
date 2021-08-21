@@ -15,7 +15,7 @@ use linux::ExecutableMemory;
 #[cfg(windows)]
 use self::windows::ExecutableMemory;
 
-pub const INITIAL_MEMORY_SIZE: usize = 0x400000;
+pub const INITIAL_MEMORY_SIZE: usize = 0x800000;
 pub const MEMORY_MINIMUM_SIZE: usize = 0x1000;
 pub const MEMORY_SIZE_INCREASE: usize = 0x1000;
 
