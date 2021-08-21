@@ -134,6 +134,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     },
     0x39 => (Op::AddHL(Register16::SP), 1, 8),
     0x3a => (Op::LoadFromIndirect(Register8::A, IndirectLocation::HLDecrement), 1, 8),
+    0x3b => (Op::Decrement16(Register16::SP), 1, 8),
     0x3c => (Op::Increment8(Register8::A), 1, 4),
     0x3d => (Op::Decrement8(Register8::A), 1, 4),
     0x3e => {

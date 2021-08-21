@@ -220,6 +220,7 @@ mod tests {
       0x23, // INC HL
       0x23, // INC HL
       0x23, // INC HL
+      0x33, // INC SP
       0x76, // HALT
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
@@ -227,7 +228,8 @@ mod tests {
     assert_eq!(core.registers.get_bc(), 1);
     assert_eq!(core.registers.get_de(), 2);
     assert_eq!(core.registers.get_hl(), 3);
-    assert_eq!(core.registers.get_ip(), 7);
+    assert_eq!(core.registers.get_sp(), 1);
+    assert_eq!(core.registers.get_ip(), 8);
   }
 
   #[test]
@@ -236,10 +238,14 @@ mod tests {
       0x01, 0x05, 0x00, // LD BC, 5
       0x11, 0x04, 0x00, // LD DE, 4
       0x21, 0x08, 0x00, // LD HL, 8
+      0x31, 0x50, 0x00, // LD SP, 0x50
       0x0b, // DEC BC
       0x1b, // DEC DE
       0x1b, // DEC DE
       0x2b, // DEC HL
+      0x3b, // DEC SP
+      0x3b, // DEC SP
+      0x3b, // DEC SP
       0x76, // HALT
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
@@ -247,7 +253,8 @@ mod tests {
     assert_eq!(core.registers.get_bc(), 4);
     assert_eq!(core.registers.get_de(), 2);
     assert_eq!(core.registers.get_hl(), 7);
-    assert_eq!(core.registers.get_ip(), 14);
+    assert_eq!(core.registers.get_sp(), 0x4d);
+    assert_eq!(core.registers.get_ip(), 20);
   }
 
   #[test]
