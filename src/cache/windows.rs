@@ -1,10 +1,6 @@
 use std::ffi::c_void;
 
-mod bindings {
-  windows::include_bindings!();
-}
-
-use bindings::{
+use crate::bindings::{
   Windows::Win32::System::Memory::VirtualAlloc,
   Windows::Win32::System::Memory::VirtualFree,
   Windows::Win32::System::Memory::VirtualProtect,

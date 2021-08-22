@@ -1,3 +1,5 @@
+#[cfg(windows)]
+pub mod bindings;
 pub mod cache;
 pub mod cpu;
 pub mod cart;
