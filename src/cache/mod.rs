@@ -23,15 +23,43 @@ pub struct CodeCache {
   exec_memory: ExecutableMemory,
   code_blocks: CachedBlocks,
   write_cursor: usize,
+
+  prologue_location: usize,
+  epilogue_location: usize,
 }
 
 impl CodeCache {
   pub fn new() -> Self {
-    Self {
+    let mut cache = Self {
       exec_memory: ExecutableMemory::new(),
       code_blocks: CachedBlocks::new(),
       write_cursor: 0,
-    }
+
+      prologue_location: 0,
+      epilogue_location: 0,
+    };
+    cache.write_prelude_block();
+    cache.write_epilogue_block();
+
+    cache
+  }
+
+  pub fn write_prelude_block(&mut self) {
+    self.prologue_location = self.write_cursor;
+    self.exec_memory.make_writable();
+    let write_area = self.exec_memory.get_memory_area_mut();
+    let length = Emitter::write_prelude_function(&mut write_area[self.write_cursor..]);
+    self.write_cursor += length;
+    self.exec_memory.make_executable();
+  }
+
+  pub fn write_epilogue_block(&mut self) {
+    self.epilogue_location = self.write_cursor;
+    self.exec_memory.make_writable();
+    let write_area = self.exec_memory.get_memory_area_mut();
+    let length = Emitter::write_epilogue_function(&mut write_area[self.write_cursor..]);
+    self.write_cursor += length;
+    self.exec_memory.make_executable();
   }
 
   pub fn get_memory_start_address(&self) -> usize {
@@ -75,7 +103,7 @@ impl CodeCache {
     let available_length = {
       self.exec_memory.make_writable();
       let translated = self.exec_memory.get_memory_area_mut();
-      write_cursor += emitter.encode_prelude(&mut translated[write_cursor..]);
+      //write_cursor += emitter.encode_prelude(&mut translated[write_cursor..]);
       translated.len()
     };
 
@@ -145,11 +173,14 @@ impl CodeCache {
   }
 
   pub fn call(&self, offset: usize, registers: &mut Registers) -> u8 {
-    let func_pointer = (self.get_memory_start_address() + offset) as *const ();
-    let func: extern "sysv64" fn(*const Registers) -> u8 = unsafe {
+    let memory_start = self.get_memory_start_address();
+    let func_pointer = (memory_start + self.prologue_location) as *const ();
+    let func: extern "sysv64" fn(*const Registers, usize, usize) -> u8 = unsafe {
       std::mem::transmute(func_pointer)
     };
-    func(registers as *const Registers)
+    let block_addr = memory_start + offset;
+    let epilogue_addr = memory_start + self.epilogue_location;
+    func(registers as *const Registers, block_addr, epilogue_addr)
   }
 
   pub fn invalidate_dirty_wram(&mut self, dirty_flags: &[u64; 128]) {

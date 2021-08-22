@@ -24,22 +24,26 @@ pub struct Emitter {
 impl Emitter {
   pub fn new(mem: *const MemoryAreas) -> Self {
     Self {
-      mem
+      mem,
     }
   }
 
-  pub fn encode_prelude(&self, exec: &mut [u8]) -> usize {
+  pub fn write_prelude_function(exec: &mut [u8]) -> usize {
     let code = [
       // preserve scratch registers that will be modified
       0x53, // push rbx
+      0x55, // push rbp
       0x41, 0x54, // push r12
       0x41, 0x55, // push r13
       0x41, 0x56, // push r14
       0x41, 0x57, // push r15
+      // preserve arguments that are needed later
+      0x57, // push rdi
+      0x52, // push rdx
       // set initial return code
       0x4d, 0x31, 0xf6, // xor r14, r14
-      // begin method, load all registers from a struct in memory
-      // the only argument (rdi) will be a pointer to the struct
+      // begin code block, load all registers from a struct in memory
+      // the first argument (rdi) will be a pointer to the struct
       0x8b, 0x07, // mov eax, [rdi]
       0x8b, 0x5f, 0x04, // mov ebx, [rdi + 4]
       0x8b, 0x57, 0x08, // mov edx, [rdi + 8]
@@ -47,14 +51,15 @@ impl Emitter {
       0x66, 0x44, 0x8b, 0x67, 0x10, // mov r12w, [rdi + 16]
       0x66, 0x44, 0x8b, 0x6f, 0x14, // mov r13w, [rdi + 20]
       0x66, 0x44, 0x8b, 0x7f, 0x18, // mov r15w, [rdi + 24]
-      0x57, // push rdi
+      // jump to the actual code, address stored in rsi
+      0xff, 0xe6, // jmp rsi
     ];
     let length = code.len();
     exec[..length].copy_from_slice(&code);
     length
   }
 
-  pub fn encode_epilogue(&self, exec: &mut [u8]) -> usize {
+  pub fn write_epilogue_function(exec: &mut [u8]) -> usize {
     let code = [
       // restore the registers to the struct before returning
       0x5f, // pop rdi
@@ -72,8 +77,19 @@ impl Emitter {
       0x41, 0x5e, // pop r14
       0x41, 0x5d, // pop r13
       0x41, 0x5c, // pop r12
+      0x5d, // pop rbp
       0x5b, // pop rbx
       0xc3, // retq
+    ];
+    let length = code.len();
+    exec[..length].copy_from_slice(&code);
+    length
+  }
+
+  pub fn encode_epilogue(&self, exec: &mut [u8]) -> usize {
+    let code = vec![
+      0x5f, // pop rdi
+      0xff, 0xe7, // jmp rdi
     ];
     let length = code.len();
     exec[..length].copy_from_slice(&code);

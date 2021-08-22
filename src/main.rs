@@ -22,7 +22,15 @@ fn main() {
   // Build and reset Dynarec Core
 
   loop {
-    core.run_code_block();
+    match core.run_state {
+      emulator::RunState::Run => core.run_code_block(),
+      emulator::RunState::Halt => {
+        // don't run CPU until an interrupt
+      },
+      emulator::RunState::Stop => {
+        // display is disabled until an interrupt
+      },
+    }
   }
 }
 
