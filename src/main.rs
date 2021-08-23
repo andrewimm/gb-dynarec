@@ -9,31 +9,23 @@ pub mod devices;
 pub mod emitter;
 pub mod emulator;
 pub mod mem;
+pub mod shell;
 pub mod system;
 
 use std::env;
+use shell::Shell;
 
 fn main() {
   // Initialize UI/Audio/Input
+  let mut emu_shell = shell::create_shell();
 
+  // Build the Dynarec Core
   let mut core = match get_file_arg().and_then(load_rom) {
     Some(core) => core,
     None => fallback_core(),
   };
-  
-  // Build and reset Dynarec Core
 
-  loop {
-    match core.run_state {
-      emulator::RunState::Run => core.run_code_block(),
-      emulator::RunState::Halt => {
-        // don't run CPU until an interrupt
-      },
-      emulator::RunState::Stop => {
-        // display is disabled until an interrupt
-      },
-    }
-  }
+  emu_shell.run(core);
 }
 
 fn get_file_arg() -> Option<String> {

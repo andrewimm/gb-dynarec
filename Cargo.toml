@@ -6,6 +6,8 @@ edition = "2018"
 
 [features]
 dump_disassembly = []
+graphics = ["winit"]
+audio = []
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
@@ -15,3 +17,6 @@ windows = "0.13.0"
 
 [target.'cfg(windows)'.build-dependencies]
 windows = "0.13.0"
+
+[dependencies]
+winit = {version = "0.25.0", optional = true}
