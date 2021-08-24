@@ -18,6 +18,7 @@ use crate::bindings::{
 };
 use crate::emulator::Core;
 use super::super::Shell;
+use std::time::Duration;
 use winit::{
   dpi::LogicalSize,
   event::{Event, WindowEvent},
@@ -63,7 +64,7 @@ impl Shell for WindowShell {
       let mut info: BITMAPINFO = std::mem::zeroed();
       info.bmiHeader.biSize = std::mem::size_of::<BITMAPINFOHEADER>() as u32;
       info.bmiHeader.biWidth = 160;
-      info.bmiHeader.biHeight = 144;
+      info.bmiHeader.biHeight = -144;
       info.bmiHeader.biPlanes = 1;
       info.bmiHeader.biBitCount = 24;
       info.bmiHeader.biCompression = 0;
@@ -96,7 +97,7 @@ impl Shell for WindowShell {
     };
     
     event_loop.run(move |event, _, control_flow| {
-      *control_flow = ControlFlow::Poll;
+      //*control_flow = ControlFlow::Poll;
 
       match event {
         Event::WindowEvent {
@@ -104,21 +105,42 @@ impl Shell for WindowShell {
           window_id,
         } => {
           if window_id == window.id() {
-            // clean up
-            unsafe {
-              DeleteObject(bitmap);
-            }
+            // clean up?
             
             *control_flow = ControlFlow::Exit;
           }
         },
-        _ => {
+        Event::MainEventsCleared => {
+          core.run_frame();
+
+          let lcd_data = core.get_screen_buffer();
+          copy_lcd(bitmap_memory, lcd_data);
           unsafe {
             draw(hwnd, bitmap);
           }
         },
+        _ => *control_flow = ControlFlow::Poll,
       }
     });
+  }
+}
+
+pub fn copy_lcd(bitmap_memory: &mut [u8], lcd_data: &Box<[u8]>) {
+  let row_size = ((160 * 24 + 31) / 32) * 4;
+  let mut x = 0;
+  let mut y = 0;
+  for i in 0..lcd_data.len() {
+    let offset = y * row_size + x * 3;
+    let pixel = lcd_data[i];
+    bitmap_memory[offset + 0] = pixel; // B
+    bitmap_memory[offset + 1] = pixel; // R
+    bitmap_memory[offset + 2] = pixel; // G
+    
+    x += 1;
+    if x >= 160 {
+      x = 0;
+      y += 1;
+    }
   }
 }
 

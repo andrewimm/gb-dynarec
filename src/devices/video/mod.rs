@@ -4,6 +4,8 @@ pub mod tile;
 use lcd::LCD;
 use super::interrupts::InterruptFlag;
 
+const COLORS: [u8; 4] = [255, 170, 85, 0];
+
 pub struct VideoState {
   lcd: LCD,
   tile_address_offset: usize,
@@ -38,6 +40,10 @@ impl VideoState {
       next_cached_tile_x: 0,
       current_tile_cache: 0,
     }
+  }
+
+  pub fn get_current_mode(&self) -> u8 {
+    self.current_mode
   }
 
   pub fn set_lcd_control(&mut self, value: u8) {
@@ -169,6 +175,7 @@ impl VideoState {
             } else {
               // On line 144, enter VBLANK and set appropriate flags
               self.current_mode = 1;
+              self.lcd.swap_buffers();
               return InterruptFlag::vblank();
             }
           }
@@ -224,7 +231,8 @@ impl VideoState {
               while tile_x < 8 && dots_remaining > 0 {
                 // shift a pixel out of the current tile cache
                 let color = (self.current_tile_cache & 3) as u8;
-                current_line_buffer[current_write_index] = color;
+                let shade = COLORS[color as usize];
+                current_line_buffer[current_write_index] = shade;
 
                 self.current_tile_cache >>= 2;
                 tile_x += 1;

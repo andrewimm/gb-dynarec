@@ -126,6 +126,19 @@ impl Core {
     }
     //println!("[{}] {:?}", result, self.registers);
   }
+
+  pub fn get_screen_buffer(&self) -> &Box<[u8]> {
+    self.memory.io.video.get_visible_buffer()
+  }
+
+  pub fn run_frame(&mut self) {
+    while self.memory.io.video.get_current_mode() != 1 {
+      self.run_code_block();
+    }
+    while self.memory.io.video.get_current_mode() == 1 {
+      self.run_code_block();
+    }
+  }
 }
 
 #[cfg(test)]
