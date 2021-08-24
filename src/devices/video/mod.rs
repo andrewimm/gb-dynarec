@@ -230,11 +230,11 @@ impl VideoState {
               let current_line_buffer = self.lcd.get_writing_buffer_line(self.current_line as usize);
               while tile_x < 8 && dots_remaining > 0 {
                 // shift a pixel out of the current tile cache
-                let color = (self.current_tile_cache & 3) as u8;
+                let color = ((self.current_tile_cache & 0xc000) >> 14) as u8;
                 let shade = COLORS[color as usize];
                 current_line_buffer[current_write_index] = shade;
 
-                self.current_tile_cache >>= 2;
+                self.current_tile_cache <<= 2;
                 tile_x += 1;
                 dots_remaining -= 1;
                 current_write_index += 1;
