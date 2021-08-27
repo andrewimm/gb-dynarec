@@ -47,6 +47,9 @@ impl IO {
       0x43 => self.video.set_scroll_x(value),
       0x44 => (),
       0x45 => self.video.set_ly_compare(value),
+
+      0x47 => self.video.set_bgp(value),
+
       _ => (),
     }
   }
@@ -69,6 +72,9 @@ impl IO {
       0x43 => self.video.get_scroll_x(),
       0x44 => self.video.get_ly(),
       0x45 => self.video.get_ly_compare(),
+
+      0x47 => self.video.get_bgp(),
+
       _ => 0xff,
     }
   }

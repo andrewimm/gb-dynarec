@@ -4,7 +4,7 @@ pub mod tile;
 use lcd::LCD;
 use super::interrupts::InterruptFlag;
 
-const COLORS: [u8; 4] = [255, 170, 85, 0];
+const SHADES: [u8; 4] = [255, 170, 85, 0];
 
 pub struct VideoState {
   lcd: LCD,
@@ -14,6 +14,10 @@ pub struct VideoState {
   window_map_offset: usize,
   lcd_control_value: u8,
   ly_compare: u8,
+  bg_palette: [u8; 4],
+  bg_palette_value: u8,
+  object_palette_0: [u8; 4],
+  object_palette_1: [u8; 4],
 
   current_mode: u8,
   current_mode_dots: usize,
@@ -32,6 +36,10 @@ impl VideoState {
       window_map_offset: 0x1800,
       lcd_control_value: 0,
       ly_compare: 0,
+      bg_palette: [0; 4],
+      bg_palette_value: 0,
+      object_palette_0: [0; 4],
+      object_palette_1: [0; 4],
 
       // start at the beginning of a vblank
       current_mode: 1,
@@ -114,6 +122,18 @@ impl VideoState {
 
   pub fn get_ly_compare(&self) -> u8 {
     self.ly_compare
+  }
+
+  pub fn set_bgp(&mut self, value: u8) {
+    self.bg_palette[0] = SHADES[(value & 3) as usize];
+    self.bg_palette[1] = SHADES[((value >> 2) & 3) as usize];
+    self.bg_palette[2] = SHADES[((value >> 4) & 3) as usize];
+    self.bg_palette[3] = SHADES[((value >> 6) & 3) as usize];
+    self.bg_palette_value = value;
+  }
+
+  pub fn get_bgp(&self) -> u8 {
+    self.bg_palette_value
   }
 
   pub fn get_tile_address(&self, index: usize) -> usize {
@@ -230,9 +250,9 @@ impl VideoState {
               let current_line_buffer = self.lcd.get_writing_buffer_line(self.current_line as usize);
               while tile_x < 8 && dots_remaining > 0 {
                 // shift a pixel out of the current tile cache
-                let color = ((self.current_tile_cache & 0xc000) >> 14) as u8;
-                let shade = COLORS[color as usize];
-                current_line_buffer[current_write_index] = shade;
+                let palette_index = ((self.current_tile_cache & 0xc000) >> 14) as u8;
+                let color = self.bg_palette[palette_index as usize];
+                current_line_buffer[current_write_index] = color;
 
                 self.current_tile_cache <<= 2;
                 tile_x += 1;
