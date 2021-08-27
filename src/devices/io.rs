@@ -42,11 +42,17 @@ impl IO {
       0x0f => self.interrupt_flag = InterruptFlag::new(value & 0x1f),
 
       0x40 => self.video.set_lcd_control(value),
-      0x41 => self.video.set_lcd_status(value),
+      0x41 => {
+        let flag = self.video.set_lcd_status(value);
+        self.interrupt_flag |= flag;
+      },
       0x42 => self.video.set_scroll_y(value),
       0x43 => self.video.set_scroll_x(value),
       0x44 => (),
-      0x45 => self.video.set_ly_compare(value),
+      0x45 => {
+        let flag = self.video.set_ly_compare(value);
+        self.interrupt_flag |= flag;
+      },
 
       0x47 => self.video.set_bgp(value),
 

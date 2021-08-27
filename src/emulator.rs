@@ -43,6 +43,13 @@ impl Core {
   /// If interrupts are enabled, check the current interrupt flags and enter the
   /// highest-priority active interrupt.
   pub fn handle_interrupt(&mut self) {
+    if self.memory.io.interrupt_flag.as_u8() == 0 {
+      return;
+    }
+    // If interrupts are disabled, it still clears the halt / stop state.
+    // It just ignores the interupt handler.
+    self.run_state = RunState::Run;
+
     if !self.interrupts_enabled {
       return;
     }
@@ -65,6 +72,7 @@ impl Core {
     // for timing accuracy, skip five machine cycles
 
     self.push_ip();
+    self.interrupts_enabled = false;
     self.registers.ip = vector;
   }
 
@@ -127,16 +135,28 @@ impl Core {
     //println!("[{}] {:?}", result, self.registers);
   }
 
+  /// Move the emulator forward
+  pub fn update(&mut self) {
+    match self.run_state {
+      RunState::Run => self.run_code_block(),
+      _ => {
+        // while CPU is blocked, update the peripherals one cycle at a time
+        self.memory.run_clock_cycles(1);
+        self.handle_interrupt();
+      },
+    }
+  }
+
   pub fn get_screen_buffer(&self) -> &Box<[u8]> {
     self.memory.io.video.get_visible_buffer()
   }
 
   pub fn run_frame(&mut self) {
     while self.memory.io.video.get_current_mode() != 1 {
-      self.run_code_block();
+      self.update();
     }
     while self.memory.io.video.get_current_mode() == 1 {
-      self.run_code_block();
+      self.update();
     }
   }
 }
@@ -2319,5 +2339,35 @@ mod tests {
     core.run_code_block();
     assert_eq!(core.memory.io.timer.get_counter(), 0);
     assert_eq!(core.registers.get_ip(), 0x50);
+  }
+
+  #[test]
+  fn vsync_interrupt() {
+    let code = vec![
+      0x31, 0xff, 0xc0, // LD SP, 0xc0ff
+      0xfb, // EI
+      0x3e, 0x01, // LD A, 0x01
+      0xea, 0xff, 0xff, // LD (0xffff), A
+      0x18, 0xfe, // JR -2
+      0x00, 0x00, 0x00, 0x00, 0x00,
+
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+
+      0xf0, 0x41, // LD A, (0xff41)
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_code_block();
+    for _ in 0..10000 { // simulate an infinite loop, but don't block all tests
+      core.run_code_block();
+      if core.registers.get_ip() != 0x09 {
+        break;
+      }
+    }
+    assert_eq!(core.registers.get_ip(), 0x40);
+    assert_eq!(core.registers.get_af() & 0xff00, 0x0100);
   }
 }

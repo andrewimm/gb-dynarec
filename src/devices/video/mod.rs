@@ -14,6 +14,10 @@ pub struct VideoState {
   window_map_offset: usize,
   lcd_control_value: u8,
   ly_compare: u8,
+  interrupt_on_lyc: bool,
+  interrupt_on_mode_2: bool,
+  interrupt_on_mode_1: bool,
+  interrupt_on_mode_0: bool,
   bg_palette: [u8; 4],
   bg_palette_value: u8,
   object_palette_0: [u8; 4],
@@ -36,6 +40,10 @@ impl VideoState {
       window_map_offset: 0x1800,
       lcd_control_value: 0,
       ly_compare: 0,
+      interrupt_on_lyc: false,
+      interrupt_on_mode_2: false,
+      interrupt_on_mode_1: false,
+      interrupt_on_mode_0: false,
       bg_palette: [0; 4],
       bg_palette_value: 0,
       object_palette_0: [0; 4],
@@ -81,13 +89,28 @@ impl VideoState {
     self.lcd_control_value
   }
 
-  pub fn set_lcd_status(&mut self, value: u8) {
-
+  pub fn set_lcd_status(&mut self, value: u8) -> InterruptFlag {
+    self.interrupt_on_lyc = value & 0x40 != 0;
+    self.interrupt_on_mode_2 = value & 0x20 != 0;
+    self.interrupt_on_mode_1 = value & 0x10 != 0;
+    self.interrupt_on_mode_0 = value & 0x08 != 0;
+    self.check_current_line()
   }
 
   pub fn get_lcd_status(&self) -> u8 {
     let mut status = 0;
-
+    if self.interrupt_on_lyc {
+      status |= 0x40;
+    }
+    if self.interrupt_on_mode_2 {
+      status |= 0x20;
+    }
+    if self.interrupt_on_mode_1 {
+      status |= 0x10;
+    }
+    if self.interrupt_on_mode_0 {
+      status |= 0x08;
+    }
     if self.ly_compare == self.current_line {
       status |= 4;
     }
@@ -116,8 +139,9 @@ impl VideoState {
     self.current_line
   }
 
-  pub fn set_ly_compare(&mut self, value: u8) {
+  pub fn set_ly_compare(&mut self, value: u8) -> InterruptFlag {
     self.ly_compare = value;
+    self.check_current_line()
   }
 
   pub fn get_ly_compare(&self) -> u8 {
@@ -170,8 +194,30 @@ impl VideoState {
     self.next_cached_tile_x += 1;
   }
 
+  fn check_current_line(&self) -> InterruptFlag {
+    if self.ly_compare == self.current_line {
+      if self.interrupt_on_lyc {
+        return InterruptFlag::stat();
+      }
+    }
+    InterruptFlag::empty()
+  }
+
+  fn check_mode_interrupt(&self) -> InterruptFlag {
+    if self.interrupt_on_mode_2 && self.current_mode == 2 {
+      InterruptFlag::stat()
+    } else if self.interrupt_on_mode_1 && self.current_mode == 1 {
+      InterruptFlag::stat()
+    } else if self.interrupt_on_mode_0 && self.current_mode == 0 {
+      InterruptFlag::stat()
+    } else {
+      InterruptFlag::empty()
+    }
+  }
+
   pub fn run_clock_cycles(&mut self, cycles: usize, vram: &Box<[u8]>) -> InterruptFlag {
     let mut cycles_remaining = cycles;
+    let mut interrupt_state = InterruptFlag::empty();
     while cycles_remaining > 0 {
       cycles_remaining -= 1;
       let previous_dot_count = self.current_mode_dots;
@@ -190,13 +236,16 @@ impl VideoState {
             if self.current_line < 144 {
               self.current_line += 1;
               self.current_mode = 2;
+              interrupt_state |= self.check_mode_interrupt();
+              interrupt_state |= self.check_current_line();
               // pre-compute up to 10 sprites that overlap the current line
               self.find_current_line_sprites();
             } else {
               // On line 144, enter VBLANK and set appropriate flags
               self.current_mode = 1;
               self.lcd.swap_buffers();
-              return InterruptFlag::vblank();
+              interrupt_state |= self.check_mode_interrupt();
+              interrupt_state |= InterruptFlag::vblank();
             }
           }
         },
@@ -208,12 +257,14 @@ impl VideoState {
 
             if self.current_line < 153 {
               self.current_line += 1;
+              interrupt_state |= self.check_current_line();
             } else {
               // VBLANK ended, start in mode 2 on line 0
               self.current_line = 0;
               self.current_mode = 2;
               // pre-compute up to 10 sprites that overlap the current line
               self.find_current_line_sprites();
+              interrupt_state |= self.check_mode_interrupt();
             }
           }
         },
@@ -237,6 +288,7 @@ impl VideoState {
           if self.current_mode_dots >= 188 {
             self.current_mode_dots -= 188;
             self.current_mode = 0;
+            interrupt_state |= self.check_mode_interrupt();
           } else if self.current_mode_dots < 160 && self.current_line < 144 {
 
             // TODO: Account for scroll-x
@@ -275,7 +327,7 @@ impl VideoState {
       };
     }
 
-    InterruptFlag::empty()
+    interrupt_state
   }
 
   pub fn get_writing_buffer(&self) -> &Box<[u8]> {
