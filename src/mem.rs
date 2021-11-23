@@ -16,6 +16,8 @@ pub struct MemoryAreas {
 
   pub wram_dirty: bool,
   pub wram_dirty_flags: Box<[u64; 128]>,
+  pub hram_dirty: bool,
+  pub hram_dirty_flags: Box<[u64; 2]>,
 
   pub io: IO,
 
@@ -59,6 +61,8 @@ impl MemoryAreas {
 
       wram_dirty: false,
       wram_dirty_flags,
+      hram_dirty: false,
+      hram_dirty_flags: Box::new([0; 2]),
 
       io: IO::new(),
 
@@ -91,6 +95,8 @@ impl MemoryAreas {
 
       wram_dirty: false,
       wram_dirty_flags: Box::new([0; 128]),
+      hram_dirty: false,
+      hram_dirty_flags: Box::new([0; 2]),
 
       io: IO::new(),
 
@@ -217,8 +223,13 @@ pub extern "sysv64" fn memory_write_byte(areas: *mut MemoryAreas, addr: u16, val
     memory_areas.io.interrupt_mask = value & 0x1f;
     return;
   }
-  // High RAM
-  memory_areas.high_ram[addr as usize & 0x7f] = value;
+  {
+    // High RAM
+    let index = addr as usize & 0x7f;
+    memory_areas.high_ram[index] = value;
+    mark_hram_dirty(index, &mut memory_areas.hram_dirty_flags);
+    memory_areas.hram_dirty = true;
+  }
 }
 
 pub extern "sysv64" fn memory_write_word(areas: *mut MemoryAreas, addr: u16, value: u16) {
@@ -238,6 +249,12 @@ extern "sysv64" fn mark_wram_dirty(index: usize, dirty_wram: &mut [u64; 128]) {
   let dirty_index = index / 64;
   let dirty_offset = DIRTY_OFFSETS[index & 63];
   dirty_wram[dirty_index] |= dirty_offset;
+}
+
+extern "sysv64" fn mark_hram_dirty(index: usize, dirty_hram: &mut [u64; 2]) {
+  let dirty_index = index / 64;
+  let dirty_offset = DIRTY_OFFSETS[index & 63];
+  dirty_hram[dirty_index] |= dirty_offset;
 }
 
 const DIRTY_OFFSETS: [u64; 64] = [

@@ -4,7 +4,7 @@ pub mod linux;
 #[cfg(windows)]
 pub mod windows;
 
-use blocks::{CachedBlocks, CodeBlock};
+use blocks::{CachedBlocks, CodeBlock, MemoryLocation};
 use crate::cpu::Registers;
 use crate::decoder::decode;
 use crate::emitter::Emitter;
@@ -91,6 +91,7 @@ impl CodeCache {
         let offset = (ip & 0xfff) + bank_start;
         &mem.work_ram[offset..bank_end]
       },
+      0xff80..=0xfffe => &mem.high_ram[(ip & 0x7f)..],
       _ => panic!("TRIED TO EXECUTE {:X}", ip),
     }
   }
@@ -202,6 +203,21 @@ impl CodeCache {
           }
           addr += 1;
           entry >>= 1;
+        }
+      }
+    }
+  }
+
+  pub fn invalidate_dirty_hram(&mut self, dirty_flags: &[u64; 2]) {
+    for (key, block) in self.code_blocks.high_ram.cache.iter() {
+      let ip = MemoryLocation::from_u32(*key).address;
+      let length = block.bytes_translated as u16;
+      let first_index = ((ip & 0x7f) / 64) as usize;
+      let last_index = (((ip + length) & 0x7f) / 64) as usize;
+      for index in first_index..=last_index {
+        let mut entry = dirty_flags[index];
+        if entry != 0 {
+          // TODO: invalidate the entry corresponding with every marked bit
         }
       }
     }

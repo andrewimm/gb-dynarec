@@ -9,8 +9,8 @@ pub struct CodeBlock {
 }
 
 pub struct MemoryLocation {
-  bank: u16,
-  address: u16,
+  pub bank: u16,
+  pub address: u16,
 }
 
 impl MemoryLocation {
@@ -42,7 +42,7 @@ impl MemoryLocation {
 /// Creating a separate cache for each banked region of memory makes it easier
 /// to perform lookup for a specific GB address.
 pub struct CacheRegion {
-  cache: BTreeMap<u32, CodeBlock>,
+  pub cache: BTreeMap<u32, CodeBlock>,
   current_bank: u16,
 }
 

@@ -132,6 +132,13 @@ impl Core {
       }
       self.memory.wram_dirty = false;
     }
+    if self.memory.hram_dirty {
+      self.cache.invalidate_dirty_hram(&self.memory.hram_dirty_flags);
+      for i in 0..64 {
+        self.memory.hram_dirty_flags[i] = 0;
+      }
+      self.memory.hram_dirty = false;
+    }
     //println!("[{}] {:?}", result, self.registers);
   }
 
