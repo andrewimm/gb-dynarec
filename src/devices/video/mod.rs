@@ -148,6 +148,10 @@ impl VideoState {
     self.ly_compare
   }
 
+  /// Set the Background Palette
+  /// The palette (for a standard monochrome GB) is an 8-bit number, where
+  /// every 2 bits represent the value of a color. Color 0 is found at the
+  /// lowest 2 bits, color 1 at the next 2 bits, and so on.
   pub fn set_bgp(&mut self, value: u8) {
     self.bg_palette[0] = SHADES[(value & 3) as usize];
     self.bg_palette[1] = SHADES[((value >> 2) & 3) as usize];
@@ -416,49 +420,50 @@ mod tests {
       }
     }
     let mut video = VideoState::new();
+    video.set_bgp(0b11100100);
     video.set_lcd_control(0x90); // enable LCD, tiles start at 0x8000
     // get to start of first line
     video.run_clock_cycles(456 * 10 / 4, &mut vram);
     // draw first line
     video.run_clock_cycles(456 / 4, &mut vram);
     for i in 0..8 {
-      assert_eq!(video.get_writing_buffer()[i], 0);
+      assert_eq!(video.get_writing_buffer()[i], 255); // white
     }
     for i in 8..16 {
-      assert_eq!(video.get_writing_buffer()[i], 1);
+      assert_eq!(video.get_writing_buffer()[i], 170); // light gray
     }
     for i in 16..24 {
-      assert_eq!(video.get_writing_buffer()[i], 2);
+      assert_eq!(video.get_writing_buffer()[i], 85); // dark gray
     }
     for i in 24..32 {
-      assert_eq!(video.get_writing_buffer()[i], 3);
+      assert_eq!(video.get_writing_buffer()[i], 0); // black
     }
     for i in 32..40 {
-      assert_eq!(video.get_writing_buffer()[i], 0);
+      assert_eq!(video.get_writing_buffer()[i], 255);
     }
     for i in 40..48 {
-      assert_eq!(video.get_writing_buffer()[i], 1);
+      assert_eq!(video.get_writing_buffer()[i], 170);
     }
     for i in 48..56 {
-      assert_eq!(video.get_writing_buffer()[i], 2);
+      assert_eq!(video.get_writing_buffer()[i], 85);
     }
     for i in 56..64 {
-      assert_eq!(video.get_writing_buffer()[i], 3);
+      assert_eq!(video.get_writing_buffer()[i], 0);
     }
 
     // draw second line
     video.run_clock_cycles(456 / 4, &mut vram);
     for i in 0..8 {
-      assert_eq!(video.get_writing_buffer()[160 + i], 3);
+      assert_eq!(video.get_writing_buffer()[160 + i], 0);
     }
     for i in 8..16 {
-      assert_eq!(video.get_writing_buffer()[160 + i], 2);
+      assert_eq!(video.get_writing_buffer()[160 + i], 85);
     }
     for i in 16..24 {
-      assert_eq!(video.get_writing_buffer()[160 + i], 1);
+      assert_eq!(video.get_writing_buffer()[160 + i], 170);
     }
     for i in 24..32 {
-      assert_eq!(video.get_writing_buffer()[160 + i], 0);
+      assert_eq!(video.get_writing_buffer()[160 + i], 255);
     }
   }
 }
