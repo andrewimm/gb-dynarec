@@ -1,6 +1,3 @@
-use std::u8;
-
-
 #[repr(C, packed)]
 pub struct Registers {
   pub af: u32,
@@ -144,7 +141,6 @@ impl Registers {
     self.hl |= value as u32;
   }
 }
-
 
 impl core::fmt::Debug for Registers {
   fn fmt(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {

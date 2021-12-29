@@ -117,19 +117,19 @@ impl Core {
     match result {
       cpu::STATUS_STOP => {
         self.run_state = RunState::Stop;
-        println!("STOP");
+        //println!("STOP");
       },
       cpu::STATUS_HALT => {
         self.run_state = RunState::Halt;
-        println!("HALT");
+        //println!("HALT");
       },
       cpu::STATUS_INTERRUPT_DISABLE => {
         self.interrupts_enabled = false;
-        println!("DISABLE INT");
+        //println!("DISABLE INT");
       },
       cpu::STATUS_INTERRUPT_ENABLE => {
         self.interrupts_enabled = true;
-        println!("ENABLE INT");
+        //println!("ENABLE INT");
       },
       _ => (),
     }
@@ -154,7 +154,7 @@ impl Core {
       }
       if self.memory.hram_dirty {
         self.cache.invalidate_dirty_hram(&self.memory.hram_dirty_flags);
-        for i in 0..64 {
+        for i in 0..2 {
           self.memory.hram_dirty_flags[i] = 0;
         }
         self.memory.hram_dirty = false;

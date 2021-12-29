@@ -723,8 +723,6 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0xfd => (Op::BitSet(Register8::L, 0x80), 2, 8),
     0xfe => (Op::BitSetIndirect(0x80), 2, 16),
     0xff => (Op::BitSet(Register8::A, 0x80), 2, 8),
-
-    _ => panic!("Unsupported CB Op: {:X}", instructions[0]),
   }
 }
 

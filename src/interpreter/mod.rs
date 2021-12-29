@@ -294,7 +294,7 @@ fn carry_sbc(a: u8, b: u8, af: u32) -> (u8, bool, bool) {
 fn carry_add_16(a: u16, b: u16) -> (u16, bool, bool) {
   let (value, overflow) = a.overflowing_add(b);
   let hc = {
-    (a & 0x0f00).wrapping_add(b & 0x0f00) & 0x1000 != 0
+    (a & 0x0fff).wrapping_add(b & 0x0fff) & 0x1000 != 0
   };
   (value, overflow, hc)
 }
@@ -957,7 +957,7 @@ fn interp_add_sp(offset: i8, registers: &mut Registers, length: u32) -> u8 {
     value.wrapping_sub(to_sub)
   };
   let carry = {
-    (value & 0xf0) + (((offset as u8) as u16) & 0xf0) & 0x100 != 0
+    (value & 0xff) + (((offset as u8) as u16) & 0xff) & 0x100 != 0
   };
   let hc = {
     ((value as u8) & 0x0f) + ((offset as u8) & 0x0f) & 0x10 != 0
@@ -988,7 +988,7 @@ fn interp_load_stack_offset(offset: i8, registers: &mut Registers, length: u32) 
     value.wrapping_sub(to_sub)
   };
   let carry = {
-    (value & 0xf0) + (((offset as u8) as u16) & 0xf0) & 0x100 != 0
+    (value & 0xff) + (((offset as u8) as u16) & 0xff) & 0x100 != 0
   };
   let hc = {
     ((value as u8) & 0x0f) + ((offset as u8) & 0x0f) & 0x10 != 0
@@ -1212,7 +1212,7 @@ fn interp_daa(registers: &mut Registers, length: u32) -> u8 {
     if registers.af & 0x40 == 0 {
       registers.af += 0x0600;
     } else {
-      registers.af -= 0x0600;
+      registers.af = registers.af.wrapping_sub(0x0600);
       if registers.af & 0x10 == 0 {
         registers.af &= 0xffff;
       }
@@ -1226,7 +1226,7 @@ fn interp_daa(registers: &mut Registers, length: u32) -> u8 {
     if registers.af & 0x40 == 0 {
       registers.af += 0x6000;
     } else {
-      registers.af -= 0x6000;
+      registers.af = registers.af.wrapping_sub(0x6000);
     }
   }
 
