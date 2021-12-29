@@ -8,6 +8,7 @@ edition = "2018"
 dump_disassembly = []
 graphics = ["winit"]
 audio = []
+interp = []
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

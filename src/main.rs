@@ -8,6 +8,7 @@ pub mod decoder;
 pub mod devices;
 pub mod emitter;
 pub mod emulator;
+pub mod interpreter;
 pub mod mem;
 pub mod shell;
 pub mod system;

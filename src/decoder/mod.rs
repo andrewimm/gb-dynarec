@@ -373,7 +373,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0xe0 => {
       let addr_low = instructions[1] as u16;
       let addr = 0xff00 | addr_low;
-      let op = Op::LoadAToMemory(addr);
+      let op = Op::LoadAToMemory(addr, false);
       (op, 2, 12)
     },
     0xe1 => (Op::Pop(Register16::HL), 1, 12),
@@ -395,7 +395,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0xe9 => (Op::JumpHL, 1, 4),
     0xea => {
       let addr = read_u16(&instructions[1..]);
-      let op = Op::LoadAToMemory(addr);
+      let op = Op::LoadAToMemory(addr, true);
       (op, 3, 16)
     },
     // eb invalid
@@ -411,7 +411,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0xf0 => {
       let addr_low = instructions[1] as u16;
       let addr = 0xff00 | addr_low;
-      let op = Op::LoadAFromMemory(addr);
+      let op = Op::LoadAFromMemory(addr, false);
       (op, 2, 12)
     },
     0xf1 => (Op::Pop(Register16::AF), 1, 12),
@@ -433,7 +433,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0xf9 => (Op::LoadToStackPointer, 1, 8),
     0xfa => {
       let addr = read_u16(&instructions[1..]);
-      let op = Op::LoadAFromMemory(addr);
+      let op = Op::LoadAFromMemory(addr, true);
       (op, 3, 16)
     },
     0xfb => (Op::InterruptEnable, 1, 4),

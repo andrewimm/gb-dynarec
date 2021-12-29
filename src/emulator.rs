@@ -1,6 +1,7 @@
 use crate::cache::CodeCache;
 use crate::cart::Header;
 use crate::cpu::{self, Registers};
+use crate::interpreter;
 use crate::mem::{MemoryAreas, memory_write_word};
 use std::fs::File;
 
@@ -14,6 +15,7 @@ pub enum RunState {
 pub struct Core {
   pub cache: CodeCache,
   pub registers: Registers,
+  pub last_block_cycle_length: usize,
   pub memory: MemoryAreas,
   pub interrupts_enabled: bool,
   pub run_state: RunState,
@@ -24,6 +26,7 @@ impl Core {
     Self {
       cache: CodeCache::new(),
       registers: Registers::new(),
+      last_block_cycle_length: 0,
       memory: MemoryAreas::with_rom(code),
       interrupts_enabled: false,
       run_state: RunState::Run,
@@ -34,6 +37,7 @@ impl Core {
     Self {
       cache: CodeCache::new(),
       registers: Registers::after_boot(),
+      last_block_cycle_length: 0,
       memory: MemoryAreas::with_rom_file(rom_file, &header),
       interrupts_enabled: false,
       run_state: RunState::Run,
@@ -88,16 +92,28 @@ impl Core {
 
   /// Run the next code block, then check for interrupts
   pub fn run_code_block(&mut self) {
-    let address = {
-      let ip = self.registers.ip as usize;
-      let found_address = self.cache.get_address_for_ip(ip);
-      if let Some(addr) = found_address {
-        addr
-      } else {
-        self.cache.translate_code_block(&self.memory.rom, ip, self.memory.as_ptr())
-      }
+    // if running in interpreted mode, disable any dynamic compilation
+    #[cfg(feature = "interp")]
+    let result = {
+      let mem_ptr = &mut self.memory as *mut MemoryAreas;
+      interpreter::run_code_block(&mut self.registers, mem_ptr)
     };
-    let result = self.cache.call(address, &mut self.registers);
+    // otherwise, use the code cache and dynarec
+    #[cfg(not(feature = "interp"))]
+    let result = {
+      let address = {
+        let ip = self.registers.ip as usize;
+        let found_address = self.cache.get_address_for_ip(ip);
+        if let Some(addr) = found_address {
+          addr
+        } else {
+          self.cache.translate_code_block(&self.memory.rom, ip, self.memory.as_ptr())
+        }
+      };
+      self.cache.call(address, &mut self.registers)
+    };
+
+    // for all modes, update the processor state and "catch up" all peripherals
     match result {
       cpu::STATUS_STOP => {
         self.run_state = RunState::Stop;
@@ -118,26 +134,31 @@ impl Core {
       _ => (),
     }
     let cycles_consumed = self.registers.get_consumed_cycles();
+    self.last_block_cycle_length = cycles_consumed;
     // catch up memmapped devices
     self.memory.run_clock_cycles(cycles_consumed);
     self.handle_interrupt();
 
-    if self.memory.wram_dirty {
-      // may need to invalidate a cache block
-      self.cache.invalidate_dirty_wram(&self.memory.wram_dirty_flags);
+    // only invalidate cache in dynarec mode
+    #[cfg(not(feature = "interp"))]
+    {
+      if self.memory.wram_dirty {
+        // may need to invalidate a cache block
+        self.cache.invalidate_dirty_wram(&self.memory.wram_dirty_flags);
 
-      // clear all dirty flags
-      for i in 0..64 {
-        self.memory.wram_dirty_flags[i] = 0;
+        // clear all dirty flags
+        for i in 0..64 {
+          self.memory.wram_dirty_flags[i] = 0;
+        }
+        self.memory.wram_dirty = false;
       }
-      self.memory.wram_dirty = false;
-    }
-    if self.memory.hram_dirty {
-      self.cache.invalidate_dirty_hram(&self.memory.hram_dirty_flags);
-      for i in 0..64 {
-        self.memory.hram_dirty_flags[i] = 0;
+      if self.memory.hram_dirty {
+        self.cache.invalidate_dirty_hram(&self.memory.hram_dirty_flags);
+        for i in 0..64 {
+          self.memory.hram_dirty_flags[i] = 0;
+        }
+        self.memory.hram_dirty = false;
       }
-      self.memory.hram_dirty = false;
     }
     //println!("[{}] {:?}", result, self.registers);
   }
@@ -2330,17 +2351,23 @@ mod tests {
       0x31, 0xff, 0xc0, // LD SP, 0xc0ff
       0xfb, // EI
       0x3e, 0x04, // LD A, 0x04
-      0xea, 0xff, 0xff, // LD (0xffff), A
+      //0xea, 0xff, 0xff, // LD (0xffff), A
+      0xe0, 0xff, // LD (0xff00 + 0xff), A
       0x3e, 0x05, // LD A, 0x05
-      0xea, 0x07, 0xff, // LD (0xff07), A
+      //0xea, 0x07, 0xff, // LD (0xff07), A
+      0xe0, 0x07, // LD (0xff00 + 0x07), A
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0xc3, 0x0e, 0x00, // JP 0x000e
+      0xc3, 0x0c, 0x00, // JP 0x000c
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block();
-    for _ in 0..255 {
+    assert_eq!(core.last_block_cycle_length, 4);
+    for i in 0..255 {
       core.run_code_block();
-      assert_eq!(core.registers.get_ip(), 0x0e);
+      println!("ITER {}", i);
+      let expect = if i == 0 { 26 } else { 16 };
+      assert_eq!(core.last_block_cycle_length, expect);
+      assert_eq!(core.registers.get_ip(), 0x0c);
     }
     assert_eq!(core.memory.io.timer.get_counter(), 255);
     core.run_code_block();

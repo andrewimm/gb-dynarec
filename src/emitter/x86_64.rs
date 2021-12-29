@@ -166,8 +166,8 @@ impl Emitter {
       Op::Swap(reg) => self.encode_swap(reg, ip_increment, exec),
       Op::SwapIndirect => self.encode_swap_indirect(ip_increment, exec),
       Op::LoadStackPointerToMemory(addr) => self.encode_load_stack_to_memory(addr, ip_increment, exec),
-      Op::LoadAToMemory(addr) => self.encode_load_a_to_memory(addr, ip_increment, exec),
-      Op::LoadAFromMemory(addr) => self.encode_load_a_from_memory(addr, ip_increment, exec),
+      Op::LoadAToMemory(addr, extra_cycle) => self.encode_load_a_to_memory(addr, extra_cycle, ip_increment, exec),
+      Op::LoadAFromMemory(addr, extra_cycle) => self.encode_load_a_from_memory(addr, extra_cycle, ip_increment, exec),
       Op::LoadToHighMem => self.encode_load_to_high_mem(ip_increment, exec),
       Op::LoadFromHighMem => self.encode_load_from_high_mem(ip_increment, exec),
       Op::Push(reg) => self.encode_push(reg, ip_increment, exec),
@@ -800,16 +800,16 @@ impl Emitter {
     len + emit_cycle_increment(5, &mut exec[len..])
   }
 
-  pub fn encode_load_a_to_memory(&self, addr: u16, ip_increment: usize, exec: &mut [u8]) -> usize {
+  pub fn encode_load_a_to_memory(&self, addr: u16, extra_cycle: bool, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_write_a_to_memory(exec, self.mem as usize, addr);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
-    len + emit_cycle_increment(3, &mut exec[len..])
+    len + emit_cycle_increment(if extra_cycle { 4 } else { 3 }, &mut exec[len..])
   }
 
-  pub fn encode_load_a_from_memory(&self, addr: u16, ip_increment: usize, exec: &mut [u8]) -> usize {
+  pub fn encode_load_a_from_memory(&self, addr: u16, extra_cycle: bool, ip_increment: usize, exec: &mut [u8]) -> usize {
     let mut len = emit_read_a_from_memory(exec, self.mem as usize, addr);
     len += emit_ip_increment(ip_increment, &mut exec[len..]);
-    len + emit_cycle_increment(3, &mut exec[len..])
+    len + emit_cycle_increment(if extra_cycle { 4 } else { 3 }, &mut exec[len..])
   }
 
   pub fn encode_load_to_high_mem(&self, ip_increment: usize, exec: &mut [u8]) -> usize {

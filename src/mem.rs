@@ -124,6 +124,28 @@ impl Drop for MemoryAreas {
   }
 }
 
+pub fn get_executable_memory_slice<'s>(start: usize, mem_ptr: *const MemoryAreas) -> &'s [u8] {
+  let mem = unsafe { &*mem_ptr };
+  match start {
+    0x0000..=0x3fff => &mem.rom[start..0x4000],
+    0x4000..=0x7fff => {
+      let bank_start = mem.rom_bank * 0x4000;
+      let bank_end = bank_start + 0x4000;
+      let offset = (start & 0x3fff) + bank_start;
+      &mem.rom[offset..bank_end]
+    },
+    0xc000..=0xcfff => &mem.work_ram[(start & 0xfff)..0x1000],
+    0xd000..=0xdfff => {
+      let bank_start = mem.wram_bank * 0x1000;
+      let bank_end = bank_start + 0x1000;
+      let offset = (start & 0xfff) + bank_start;
+      &mem.work_ram[offset..bank_end]
+    },
+    0xff80..=0xfffe => &mem.high_ram[(start & 0x7f)..],
+    _ => panic!("TRIED TO EXECUTE {:X}", start),
+  }
+}
+
 fn create_buffer(size: usize) -> Box<[u8]> {
   let mut buffer = Vec::<u8>::with_capacity(size);
   for _ in 0..size {

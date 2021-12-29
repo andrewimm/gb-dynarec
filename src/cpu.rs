@@ -1,3 +1,5 @@
+use std::u8;
+
 
 #[repr(C, packed)]
 pub struct Registers {
@@ -7,7 +9,7 @@ pub struct Registers {
   pub hl: u32,
   pub sp: u32,
   pub ip: u32,
-  cycles: u32,
+  pub cycles: u32,
 }
 
 impl Registers {
@@ -64,7 +66,85 @@ impl Registers {
     self.cycles = 0;
     cycles as usize
   }
+
+  #[inline(always)]
+  pub fn get_a(&self) -> u8 {
+    (self.af >> 8) as u8
+  }
+
+  #[inline(always)]
+  pub fn set_a(&mut self, value: u8) {
+    self.af &= 0x00ff;
+    self.af |= (value as u32) << 8;
+  }
+
+  #[inline(always)]
+  pub fn get_b(&self) -> u8 {
+    (self.bc >> 8) as u8
+  }
+
+  #[inline(always)]
+  pub fn set_b(&mut self, value: u8) {
+    self.bc &= 0x00ff;
+    self.bc |= (value as u32) << 8;
+  }
+
+  #[inline(always)]
+  pub fn get_c(&self) -> u8 {
+    (self.bc & 0xff) as u8
+  }
+
+  #[inline(always)]
+  pub fn set_c(&mut self, value: u8) {
+    self.bc &= 0xff00;
+    self.bc |= value as u32;
+  }
+
+  #[inline(always)]
+  pub fn get_d(&self) -> u8 {
+    (self.de >> 8) as u8
+  }
+
+  #[inline(always)]
+  pub fn set_d(&mut self, value: u8) {
+    self.de &= 0x00ff;
+    self.de |= (value as u32) << 8;
+  }
+
+  #[inline(always)]
+  pub fn get_e(&self) -> u8 {
+    (self.de & 0xff) as u8
+  }
+
+  #[inline(always)]
+  pub fn set_e(&mut self, value: u8) {
+    self.de &= 0xff00;
+    self.de |= value as u32;
+  }
+
+  #[inline(always)]
+  pub fn get_h(&self) -> u8 {
+    (self.hl >> 8) as u8
+  }
+
+  #[inline(always)]
+  pub fn set_h(&mut self, value: u8) {
+    self.hl &= 0x00ff;
+    self.hl |= (value as u32) << 8;
+  }
+
+  #[inline(always)]
+  pub fn get_l(&self) -> u8 {
+    (self.hl & 0xff) as u8
+  }
+
+  #[inline(always)]
+  pub fn set_l(&mut self, value: u8) {
+    self.hl &= 0xff00;
+    self.hl |= value as u32;
+  }
 }
+
 
 impl core::fmt::Debug for Registers {
   fn fmt(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
