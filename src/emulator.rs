@@ -12,12 +12,19 @@ pub enum RunState {
   Halt,
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum InterruptState {
+  Enabled,
+  Disabled,
+  EnableNext,
+}
+
 pub struct Core {
   pub cache: CodeCache,
   pub registers: Registers,
   pub last_block_cycle_length: usize,
   pub memory: MemoryAreas,
-  pub interrupts_enabled: bool,
+  pub interrupts_enabled: InterruptState,
   pub run_state: RunState,
 }
 
@@ -28,7 +35,7 @@ impl Core {
       registers: Registers::new(),
       last_block_cycle_length: 0,
       memory: MemoryAreas::with_rom(code),
-      interrupts_enabled: false,
+      interrupts_enabled: InterruptState::Disabled,
       run_state: RunState::Run,
     }
   }
@@ -39,7 +46,7 @@ impl Core {
       registers: Registers::after_boot(),
       last_block_cycle_length: 0,
       memory: MemoryAreas::with_rom_file(rom_file, &header),
-      interrupts_enabled: false,
+      interrupts_enabled: InterruptState::Disabled,
       run_state: RunState::Run,
     }
   }
@@ -50,12 +57,14 @@ impl Core {
     if self.memory.io.interrupt_flag.as_u8() == 0 {
       return;
     }
+
     // If interrupts are disabled, it still clears the halt / stop state.
     // It just ignores the interupt handler.
     self.run_state = RunState::Run;
 
-    if !self.interrupts_enabled {
-      return;
+    match self.interrupts_enabled {
+      InterruptState::Enabled => (),
+      _ => return,
     }
     let interrupts = self.memory.io.get_active_interrupts();
     if interrupts == 0 {
@@ -76,7 +85,7 @@ impl Core {
     // for timing accuracy, skip five machine cycles
 
     self.push_ip();
-    self.interrupts_enabled = false;
+    self.interrupts_enabled = InterruptState::Disabled;
     self.registers.ip = vector;
   }
 
@@ -124,11 +133,11 @@ impl Core {
         //println!("HALT");
       },
       cpu::STATUS_INTERRUPT_DISABLE => {
-        self.interrupts_enabled = false;
+        self.interrupts_enabled = InterruptState::Disabled;
         //println!("DISABLE INT");
       },
       cpu::STATUS_INTERRUPT_ENABLE => {
-        self.interrupts_enabled = true;
+        self.interrupts_enabled = InterruptState::Enabled;
         //println!("ENABLE INT");
       },
       _ => (),
@@ -163,10 +172,73 @@ impl Core {
     //println!("[{}] {:?}", result, self.registers);
   }
 
+  #[inline(always)]
+  fn run_interp(&mut self) {
+    // TODO: check if the current instruction starts a compiled block,
+    // and run that instead
+        
+    let result = {
+      let mem_ptr = &mut self.memory as *mut MemoryAreas;
+      match interpreter::run_next_op(&mut self.registers, mem_ptr) {
+        Some((status, is_block_end)) => {
+          if is_block_end {
+            // mark this block as visited, keep a hit count
+          }
+          if let InterruptState::EnableNext = self.interrupts_enabled {
+            self.interrupts_enabled = InterruptState::Enabled;
+          }
+          status
+        },
+        None => {
+          panic!("Reached the end of an executable section");
+        },
+      }
+    };
+
+    match result {
+      cpu::STATUS_STOP => {
+        self.run_state = RunState::Stop;
+      },
+      cpu::STATUS_HALT => {
+        self.run_state = RunState::Halt;
+      },
+      cpu::STATUS_INTERRUPT_DISABLE => {
+        self.interrupts_enabled = InterruptState::Disabled;
+      },
+      cpu::STATUS_INTERRUPT_ENABLE => {
+        if let InterruptState::Disabled = self.interrupts_enabled {
+          self.interrupts_enabled = InterruptState::EnableNext;
+        }
+      },
+      _ => (),
+    }
+    let cycles_consumed = self.registers.get_consumed_cycles();
+    self.memory.run_clock_cycles(cycles_consumed);
+    self.handle_interrupt();
+  }
+
   /// Move the emulator forward
+  /// By default, the emulator will interpret the next instruction and run the
+  /// peripherals. It also tracks "blocks" of code -- continuous sections of
+  /// instructions with no control flow changes. If a block is ended, it is
+  /// recorded. A block that is visited many times is a candidate for dynamic
+  /// recompilation.
+  /// If the current instruction is the start of a compiled block, the emulator
+  /// will run the full block and then catch-up the peripherals.
   pub fn update(&mut self) {
     match self.run_state {
-      RunState::Run => self.run_code_block(),
+      RunState::Run => {
+
+        #[cfg(feature = "interp")]
+        {
+          self.run_interp();
+        }
+
+        #[cfg(not(feature = "interp"))]
+        {
+          self.run_code_block();
+        }
+      },
       _ => {
         // while CPU is blocked, update the peripherals one cycle at a time
         self.memory.run_clock_cycles(1);
@@ -191,7 +263,7 @@ impl Core {
 
 #[cfg(test)]
 mod tests {
-  use super::{Core, RunState};
+  use super::{Core, InterruptState, RunState};
 
   #[test]
   fn load_8_bit_absolute() {
@@ -2257,13 +2329,13 @@ mod tests {
       0xd9, // RETI
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
-    core.interrupts_enabled = false;
+    core.interrupts_enabled = InterruptState::Disabled;
     core.run_code_block();
     assert_eq!(core.registers.get_ip(), 0x08);
     core.run_code_block();
     assert_eq!(core.registers.get_sp(), 0xc100);
     assert_eq!(core.registers.get_ip(), 0x06);
-    assert!(core.interrupts_enabled);
+    assert_eq!(core.interrupts_enabled, InterruptState::Enabled);
   }
   
   #[test]

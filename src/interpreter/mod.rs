@@ -6,6 +6,16 @@ use crate::mem::{get_executable_memory_slice, memory_read_byte, memory_write_byt
 pub fn run_code_block(registers: &mut Registers, mem: *mut MemoryAreas) -> u8 {
   let mut status = cpu::STATUS_NORMAL;
   loop {
+    match run_next_op(registers, mem) {
+      Some((op_status, should_break)) => {
+        status = op_status;
+        if should_break {
+          break;
+        }
+      },
+      None => break,
+    }
+    /*
     let index = registers.ip as usize;
     let code_slice = get_executable_memory_slice(index, mem);
     if code_slice.len() < 1 {
@@ -20,9 +30,24 @@ pub fn run_code_block(registers: &mut Registers, mem: *mut MemoryAreas) -> u8 {
     if should_break {
       break;
     }
+    */
   }
 
   status
+}
+
+pub fn run_next_op(registers: &mut Registers, mem: *mut MemoryAreas) -> Option<(u8, bool)> {
+  let index = registers.ip as usize;
+  let code_slice = get_executable_memory_slice(index, mem);
+  if code_slice.len() < 1 {
+    return None;
+  }
+  let (next_op, length, cycles) = decode(code_slice);
+  let should_break = next_op.is_block_end();
+  let status = run_op(next_op, registers, mem, length as u32);
+  registers.cycles += (cycles / 4) as u32;
+
+  return Some((status, should_break));
 }
 
 pub fn run_op(op: Op, registers: &mut Registers, mem: *mut MemoryAreas, length: u32) -> u8 {
