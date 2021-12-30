@@ -2,6 +2,8 @@ pub mod lcd;
 pub mod tile;
 
 use lcd::LCD;
+use crate::timing::ClockCycles;
+
 use super::interrupts::InterruptFlag;
 
 const SHADES: [u8; 4] = [255, 170, 85, 0];
@@ -219,11 +221,11 @@ impl VideoState {
     }
   }
 
-  pub fn run_clock_cycles(&mut self, cycles: usize, vram: &Box<[u8]>) -> InterruptFlag {
-    let mut cycles_remaining = cycles;
+  pub fn run_clock_cycles(&mut self, cycles: ClockCycles, vram: &Box<[u8]>) -> InterruptFlag {
+    let mut cycles_remaining = cycles.as_usize();
     let mut interrupt_state = InterruptFlag::empty();
     while cycles_remaining > 0 {
-      cycles_remaining -= 1;
+      cycles_remaining -= 4;
       let previous_dot_count = self.current_mode_dots;
       self.current_mode_dots += 4;
       match self.current_mode {
@@ -345,6 +347,7 @@ impl VideoState {
 
 #[cfg(test)]
 mod tests {
+  use crate::timing::ClockCycles;
   use super::VideoState;
 
   #[test]
@@ -371,18 +374,18 @@ mod tests {
     assert_eq!(video.get_lcd_status() & 3, 1);
     assert_eq!(video.get_ly(), 144);
     for i in 1..10 {
-      video.run_clock_cycles(456 / 4, &mut vram);
+      video.run_clock_cycles(ClockCycles(456), &mut vram);
       assert_eq!(video.get_ly(), 144 + i);
     }
-    video.run_clock_cycles(456 / 4, &mut vram);
+    video.run_clock_cycles(ClockCycles(456), &mut vram);
     // should now be in mode 2 of the first line
     assert_eq!(video.get_lcd_status() & 3, 2);
     assert_eq!(video.get_ly(), 0);
-    video.run_clock_cycles(80 / 4, &mut vram);
+    video.run_clock_cycles(ClockCycles(80), &mut vram);
     // now in mode 3
     assert_eq!(video.get_lcd_status() & 3, 3);
     assert_eq!(video.get_ly(), 0);
-    video.run_clock_cycles(376 / 4, &mut vram);
+    video.run_clock_cycles(ClockCycles(376), &mut vram);
     // 376 cycles covers mode 3 and mode 0, skipping to the next line
     assert_eq!(video.get_lcd_status() & 3, 2);
     assert_eq!(video.get_ly(), 1);
@@ -423,9 +426,9 @@ mod tests {
     video.set_bgp(0b11100100);
     video.set_lcd_control(0x90); // enable LCD, tiles start at 0x8000
     // get to start of first line
-    video.run_clock_cycles(456 * 10 / 4, &mut vram);
+    video.run_clock_cycles(ClockCycles(456 * 10), &mut vram);
     // draw first line
-    video.run_clock_cycles(456 / 4, &mut vram);
+    video.run_clock_cycles(ClockCycles(456), &mut vram);
     for i in 0..8 {
       assert_eq!(video.get_writing_buffer()[i], 255); // white
     }
@@ -452,7 +455,7 @@ mod tests {
     }
 
     // draw second line
-    video.run_clock_cycles(456 / 4, &mut vram);
+    video.run_clock_cycles(ClockCycles(456), &mut vram);
     for i in 0..8 {
       assert_eq!(video.get_writing_buffer()[160 + i], 0);
     }

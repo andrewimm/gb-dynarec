@@ -1,3 +1,4 @@
+use crate::timing::ClockCycles;
 use super::interrupts::InterruptFlag;
 
 pub struct Timer {
@@ -122,7 +123,8 @@ impl Timer {
     self.control_value
   }
 
-  pub fn run_cycles(&mut self, cycles: u32) -> InterruptFlag {
+  pub fn run_cycles(&mut self, clock_cycles: ClockCycles) -> InterruptFlag {
+    let cycles = clock_cycles.as_u32();
     if self.enabled_mask == 0 {
       // skip the edge checking
       self.cycle_count += cycles;
@@ -147,16 +149,18 @@ impl Timer {
 
 #[cfg(test)]
 mod tests {
-  use super::{InterruptFlag, Timer};
+  use super::{ClockCycles, InterruptFlag, Timer};
 
   #[test]
   fn timer_increment() {
     let mut timer = Timer::new();
+    // set the timer speed to CLOCK/16; every 16 Clock cycles will increment
+    // the timer
     timer.set_timer_control(5);
-    timer.run_cycles(15);
+    timer.run_cycles(ClockCycles(15));
     assert_eq!(timer.get_cycle_count(), 15);
     assert_eq!(timer.get_counter(), 0);
-    timer.run_cycles(1);
+    timer.run_cycles(ClockCycles(1));
     assert_eq!(timer.get_counter(), 1);
   }
 
@@ -185,9 +189,9 @@ mod tests {
     let mut timer = Timer::new();
     timer.set_modulo(200);
     timer.set_timer_control(5);
-    assert_eq!(timer.run_cycles(255 * 16), InterruptFlag::empty());
+    assert_eq!(timer.run_cycles(ClockCycles(255 * 16)), InterruptFlag::empty());
     assert_eq!(timer.get_counter(), 255);
-    assert_eq!(timer.run_cycles(16), InterruptFlag::timer());
+    assert_eq!(timer.run_cycles(ClockCycles(16)), InterruptFlag::timer());
     assert_eq!(timer.get_counter(), 200);
   }
 }

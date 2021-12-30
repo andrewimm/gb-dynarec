@@ -3,6 +3,7 @@ use crate::cart::Header;
 use crate::cpu::{self, Registers};
 use crate::interpreter;
 use crate::mem::{MemoryAreas, memory_write_word};
+use crate::timing::{ClockCycles, MachineCycles};
 use std::fs::File;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -142,10 +143,10 @@ impl Core {
       },
       _ => (),
     }
-    let cycles_consumed = self.registers.get_consumed_cycles();
-    self.last_block_cycle_length = cycles_consumed;
+    let cycles_consumed = MachineCycles(self.registers.get_consumed_cycles());
+    self.last_block_cycle_length = cycles_consumed.as_usize();
     // catch up memmapped devices
-    self.memory.run_clock_cycles(cycles_consumed);
+    self.memory.run_clock_cycles(cycles_consumed.to_clock_cycles());
     self.handle_interrupt();
 
     // only invalidate cache in dynarec mode
@@ -214,8 +215,8 @@ impl Core {
       },
       _ => (),
     }
-    let cycles_consumed = self.registers.get_consumed_cycles();
-    self.memory.run_clock_cycles(cycles_consumed);
+    let cycles_consumed = MachineCycles(self.registers.get_consumed_cycles());
+    self.memory.run_clock_cycles(cycles_consumed.to_clock_cycles());
     self.handle_interrupt();
   }
 
@@ -242,7 +243,7 @@ impl Core {
       },
       _ => {
         // while CPU is blocked, update the peripherals one cycle at a time
-        self.memory.run_clock_cycles(1);
+        self.memory.run_clock_cycles(ClockCycles(4));
         self.handle_interrupt();
       },
     }
@@ -2441,28 +2442,83 @@ mod tests {
       0x31, 0xff, 0xc0, // LD SP, 0xc0ff
       0xfb, // EI
       0x3e, 0x04, // LD A, 0x04
-      //0xea, 0xff, 0xff, // LD (0xffff), A
       0xe0, 0xff, // LD (0xff00 + 0xff), A
       0x3e, 0x05, // LD A, 0x05
-      //0xea, 0x07, 0xff, // LD (0xff07), A
       0xe0, 0x07, // LD (0xff00 + 0x07), A
-      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-      0xc3, 0x0c, 0x00, // JP 0x000c
+      0x3e, 0x00, // LD A, 0x00
+      0xe0, 0x05, // LD (0xff00 + 0x05), A
+      0xc3, 0x10, 0x00, // JP 0x0010
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     core.run_code_block();
     assert_eq!(core.last_block_cycle_length, 4);
-    for i in 0..255 {
-      core.run_code_block();
-      println!("ITER {}", i);
-      let expect = if i == 0 { 26 } else { 16 };
-      assert_eq!(core.last_block_cycle_length, expect);
-      assert_eq!(core.registers.get_ip(), 0x0c);
+    core.run_interp();
+    core.run_interp();
+    core.run_interp();
+    core.run_interp();
+    core.run_interp();
+    core.run_interp();
+    assert_eq!(core.memory.io.timer.get_counter(), 0);
+    for i in 1..=255 {
+      core.run_interp();
+      assert_eq!(core.registers.get_ip(), 0x10);
+      assert_eq!(core.memory.io.timer.get_counter(), i);
     }
-    assert_eq!(core.memory.io.timer.get_counter(), 255);
     core.run_code_block();
     assert_eq!(core.memory.io.timer.get_counter(), 0);
     assert_eq!(core.registers.get_ip(), 0x50);
+  }
+
+  #[test]
+  fn timer_cycles() {
+    let code = vec![
+      0x31, 0xf0, 0xc0, // LD SP, 0xc0f0
+      // $TAC = 0x05, enable and set speed to CPU/16
+      0x3e, 0x05, // LD A, 0x05
+      0xe0, 0x07, // LD (0xff00 + 0x07), A
+      // $TIMA = 0
+      0x3e, 0x00, // LD A, 0x00
+      0xe0, 0x05, // LD (0xff00 + 0x05), A
+      // $IF = 0
+      0x3e, 0x00, // LD A, 0x00
+      0xe0, 0x0f, // LD (0xff00 + 0x0f), A
+      // Delay 500 cycles
+      0x0e, 124, // LD C, 124
+      0x0d, // DEC C
+      0x20, 0xff, // JR NZ, -1
+      0x00, 0x00,
+
+      0x0e, 124,
+      0x0d,
+      0x20, 0xff,
+      0x00, 0x00,
+
+      0x0e, 124,
+      0x0d,
+      0x20, 0xff,
+      0x00, 0x00,
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    for _ in 0..1000 {
+      if core.registers.get_ip() == 22 {
+        break;
+      }
+      core.run_interp();
+    }
+    assert_eq!(core.memory.io.interrupt_flag.as_u8() & 0x04, 0);
+    for _ in 0..1000 {
+      if core.registers.get_ip() == 29 {
+        break;
+      }
+      core.run_interp();
+    }
+    for _ in 0..1000 {
+      if core.registers.get_ip() == 36 {
+        break;
+      }
+      core.run_interp();
+    }
+    assert_eq!(core.memory.io.interrupt_flag.as_u8() & 0x04, 0x04);
   }
 
   #[test]

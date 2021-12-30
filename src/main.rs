@@ -12,6 +12,7 @@ pub mod interpreter;
 pub mod mem;
 pub mod shell;
 pub mod system;
+pub mod timing;
 
 use std::env;
 use shell::Shell;

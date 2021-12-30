@@ -1,5 +1,6 @@
 use crate::cart::Header;
 use crate::devices::io::IO;
+use crate::timing::ClockCycles;
 use std::fs::File;
 
 pub struct MemoryAreas {
@@ -108,7 +109,7 @@ impl MemoryAreas {
     self as *const Self
   }
 
-  pub fn run_clock_cycles(&mut self, cycles: usize) {
+  pub fn run_clock_cycles(&mut self, cycles: ClockCycles) {
     self.io.run_clock_cycles(cycles, &self.video_ram);
   }
 }

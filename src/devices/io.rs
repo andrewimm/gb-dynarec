@@ -1,3 +1,5 @@
+use crate::timing::ClockCycles;
+
 use super::interrupts::InterruptFlag;
 use super::joypad::Joypad;
 use super::serial::SerialComms;
@@ -92,8 +94,11 @@ impl IO {
   /// Catch up the internal clocks of peripherals on the bus.
   /// Every time the CPU runs for a series of instructions, this should be
   /// called to keep the rest of the devices in sync.
-  pub fn run_clock_cycles(&mut self, cycles: usize, vram: &Box<[u8]>) {
-    let mut flags = self.timer.run_cycles(cycles as u32);
+  /// Since many of the devices run in terms of clock cycles, not machine (cpu)
+  /// cycles, the submitted number of cycles should be 4x the number of machine
+  /// cycles that have passed.
+  pub fn run_clock_cycles(&mut self, cycles: ClockCycles, vram: &Box<[u8]>) {
+    let mut flags = self.timer.run_cycles(cycles);
     flags |= self.video.run_clock_cycles(cycles, vram);
     flags |= self.joypad.get_interrupt();
 
