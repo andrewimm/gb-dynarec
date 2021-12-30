@@ -154,6 +154,7 @@ fn create_buffer(size: usize) -> Box<[u8]> {
   buffer.into_boxed_slice()
 }
 
+#[inline(never)]
 pub extern "sysv64" fn memory_read_byte(areas: *const MemoryAreas, addr: u16) -> u8 {
   let memory_areas: &MemoryAreas = unsafe { &*areas };
   if addr < 0x4000 { // ROM Bank 0
@@ -197,6 +198,7 @@ pub extern "sysv64" fn memory_read_byte(areas: *const MemoryAreas, addr: u16) ->
   memory_areas.high_ram[addr as usize & 0x7f]
 }
 
+#[inline(never)]
 pub extern "sysv64" fn memory_write_byte(areas: *mut MemoryAreas, addr: u16, value: u8) {
   let memory_areas: &mut MemoryAreas = unsafe { &mut *areas };
   if addr < 0x4000 { // ROM Bank 0
@@ -254,6 +256,7 @@ pub extern "sysv64" fn memory_write_byte(areas: *mut MemoryAreas, addr: u16, val
   }
 }
 
+#[inline(never)]
 pub extern "sysv64" fn memory_write_word(areas: *mut MemoryAreas, addr: u16, value: u16) {
   let low = (value & 0xff) as u8;
   let high = (value >> 8) as u8;
@@ -261,6 +264,7 @@ pub extern "sysv64" fn memory_write_word(areas: *mut MemoryAreas, addr: u16, val
   memory_write_byte(areas, addr + 1, high);
 }
 
+#[inline(never)]
 pub extern "sysv64" fn memory_read_word(areas: *mut MemoryAreas, addr: u16) -> u16 {
   let low = memory_read_byte(areas, addr) as u16;
   let high = memory_read_byte(areas, addr + 1) as u16;

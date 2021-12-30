@@ -1383,5 +1383,5 @@ fn interp_return(cond: JumpCondition, registers: &mut Registers, mem: *mut Memor
 fn interp_reti(registers: &mut Registers, mem: *mut MemoryAreas) -> u8 {
   let addr = pop(registers, mem);
   registers.ip = addr as u32;
-  cpu::STATUS_INTERRUPT_ENABLE
+  cpu::STATUS_INTERRUPT_ENABLE_IMMEDIATE
 }

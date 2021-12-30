@@ -54,7 +54,8 @@ impl Core {
   /// If interrupts are enabled, check the current interrupt flags and enter the
   /// highest-priority active interrupt.
   pub fn handle_interrupt(&mut self) {
-    if self.memory.io.interrupt_flag.as_u8() == 0 {
+    let interrupts = self.memory.io.get_active_interrupts();
+    if interrupts == 0 {
       return;
     }
 
@@ -65,10 +66,6 @@ impl Core {
     match self.interrupts_enabled {
       InterruptState::Enabled => (),
       _ => return,
-    }
-    let interrupts = self.memory.io.get_active_interrupts();
-    if interrupts == 0 {
-      return;
     }
     let (vector, clear): (u32, u8) = if interrupts & 1 != 0 {
       (0x40, 0x01) // VBLANK
@@ -81,8 +78,10 @@ impl Core {
     } else {
       (0x60, 0x10) // input
     };
+
     self.memory.io.interrupt_flag.clear(clear);
     // for timing accuracy, skip five machine cycles
+
 
     self.push_ip();
     self.interrupts_enabled = InterruptState::Disabled;
@@ -136,7 +135,8 @@ impl Core {
         self.interrupts_enabled = InterruptState::Disabled;
         //println!("DISABLE INT");
       },
-      cpu::STATUS_INTERRUPT_ENABLE => {
+      cpu::STATUS_INTERRUPT_ENABLE
+        | cpu::STATUS_INTERRUPT_ENABLE_IMMEDIATE => {
         self.interrupts_enabled = InterruptState::Enabled;
         //println!("ENABLE INT");
       },
@@ -172,11 +172,10 @@ impl Core {
     //println!("[{}] {:?}", result, self.registers);
   }
 
-  #[inline(always)]
-  fn run_interp(&mut self) {
+  pub fn run_interp(&mut self) {
     // TODO: check if the current instruction starts a compiled block,
     // and run that instead
-        
+
     let result = {
       let mem_ptr = &mut self.memory as *mut MemoryAreas;
       match interpreter::run_next_op(&mut self.registers, mem_ptr) {
@@ -210,6 +209,9 @@ impl Core {
           self.interrupts_enabled = InterruptState::EnableNext;
         }
       },
+      cpu::STATUS_INTERRUPT_ENABLE_IMMEDIATE => {
+        self.interrupts_enabled = InterruptState::Enabled;
+      },
       _ => (),
     }
     let cycles_consumed = self.registers.get_consumed_cycles();
@@ -228,7 +230,6 @@ impl Core {
   pub fn update(&mut self) {
     match self.run_state {
       RunState::Run => {
-
         #[cfg(feature = "interp")]
         {
           self.run_interp();
@@ -2359,6 +2360,23 @@ mod tests {
   }
 
   #[test]
+  fn interrupt_disabled() {
+    let code = vec![
+      0x31, 0xf0, 0xc0, // LD SP, 0xc0f0
+      0x3e, 0x10, // LD A, 0x10
+      0xe0, 0xff, // LD (0xff00 + 0xff), A
+      0xe0, 0x0f, // LD (0xff00 + 0x0f), A
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_interp();
+    core.run_interp();
+    core.run_interp();
+    core.run_interp();
+    assert_eq!(core.memory.io.interrupt_flag.as_u8(), 0x10);
+    assert_eq!(core.registers.get_ip(), 0x09);
+  }
+
+  #[test]
   fn interrupt() {
     let code = vec![
       0x31, 0xff, 0xc0, // LD SP, 0xc0ff
@@ -2475,5 +2493,43 @@ mod tests {
     }
     assert_eq!(core.registers.get_ip(), 0x40);
     assert_eq!(core.registers.get_af() & 0xff00, 0x0100);
+  }
+
+  #[test]
+  fn ei_halt() {
+    let code = vec![
+      0xfb, // EI
+      0x76, // HALT
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_interp();
+    assert_eq!(core.interrupts_enabled, InterruptState::EnableNext);
+    core.run_interp();
+    assert_eq!(core.interrupts_enabled, InterruptState::Enabled);
+    assert_eq!(core.run_state, RunState::Halt);
+  }
+
+  #[test]
+  fn ei() {
+    let code = vec![
+      0x31, 0xf0, 0xc0, // LD SP, 0xc0f0
+      0x3e, 0x10, // LD A, 0x10
+      0xe0, 0x0f, // LD (0xff00 + 0x0f), A
+      0xe0, 0xff, // LD (0xff00 + 0xff), A
+      0xfb, // EI
+      0x3e, 0xbb, // LD A, 0xbb
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_interp();
+    core.run_interp();
+    core.run_interp();
+    core.run_interp();
+    assert_eq!(core.memory.io.get_active_interrupts(), 0x10);
+    core.run_interp();
+    assert_eq!(core.interrupts_enabled, InterruptState::EnableNext);
+    assert_eq!(core.registers.get_ip(), 0x0a);
+    core.run_interp();
+    assert_eq!(core.registers.get_a(), 0xbb);
+    assert_eq!(core.registers.get_ip(), 0x60);
   }
 }

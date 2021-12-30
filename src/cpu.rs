@@ -166,3 +166,4 @@ pub const STATUS_STOP: u8 = 1;
 pub const STATUS_HALT: u8 = 2;
 pub const STATUS_INTERRUPT_DISABLE: u8 = 3;
 pub const STATUS_INTERRUPT_ENABLE: u8 = 4;
+pub const STATUS_INTERRUPT_ENABLE_IMMEDIATE: u8 = 5;

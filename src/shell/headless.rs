@@ -16,6 +16,8 @@ impl HeadlessShell {
 impl Shell for HeadlessShell {
   fn run(&mut self, mut core: Core) {
     loop {
+      core.update();
+      /*
       match core.run_state {
         emulator::RunState::Run => core.run_code_block(),
         emulator::RunState::Halt => {
@@ -25,6 +27,7 @@ impl Shell for HeadlessShell {
           // display is disabled until an interrupt
         },
       }
+      */
     }
   }
 }
