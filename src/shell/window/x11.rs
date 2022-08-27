@@ -1,5 +1,6 @@
 use raw_window_handle::{XlibDisplayHandle, XlibWindowHandle};
 use super::VideoImpl;
+use winit::dpi::PhysicalSize;
 
 pub struct Video {
   scale: usize,
@@ -123,6 +124,24 @@ impl VideoImpl for Video {
 
       (self.xlib.XDestroyImage)(image);
     }
+  }
+
+  fn increase_scale(&mut self) -> PhysicalSize<u32> {
+    if self.scale >= 8 {
+      return PhysicalSize::new(160 * self.scale as u32, 144 * self.scale as u32);
+    }
+    let new_scale = self.scale * 2;
+    self.set_scale(new_scale);
+    PhysicalSize::new(160 * new_scale as u32, 144 * new_scale as u32)
+  }
+
+  fn decrease_scale(&mut self) -> PhysicalSize<u32> {
+    if self.scale <= 1 {
+      return PhysicalSize::new(160 * self.scale as u32, 144 * self.scale as u32);
+    }
+    let new_scale = self.scale / 2;
+    self.set_scale(new_scale);
+    PhysicalSize::new(160 * new_scale as u32, 144 * new_scale as u32)
   }
 }
 

@@ -7,7 +7,7 @@ use raw_window_handle::{
 };
 use winit::{
   dpi::PhysicalSize,
-  event::{Event, WindowEvent},
+  event::{ElementState, Event, VirtualKeyCode, WindowEvent},
   event_loop::{ControlFlow, EventLoop},
   window::WindowBuilder,
 };
@@ -62,13 +62,40 @@ impl super::Shell for WindowShell {
     event_loop.run(move |event, _, control_flow| {
       match event {
         Event::WindowEvent {
-          event: WindowEvent::CloseRequested,
+          event: e,
           window_id,
         } => {
           if window_id == window.id() {
-            // clean up?
-            
-            *control_flow = ControlFlow::Exit;
+            match e {
+              WindowEvent::CloseRequested => {
+                // clean up?
+
+                *control_flow = ControlFlow::Exit;
+              },
+              WindowEvent::KeyboardInput { input, .. } => {
+                let pressed = input.state == ElementState::Pressed;
+                let is_ctrl = input.modifiers.ctrl();
+                match input.virtual_keycode {
+                  Some(VirtualKeyCode::Equals) => {
+                    if is_ctrl && pressed {
+                      let new_size = video_impl.increase_scale();
+                      window.set_inner_size(new_size);
+                    }
+                  },
+                  Some(VirtualKeyCode::Minus) => {
+                    if is_ctrl && pressed {
+                      let new_size = video_impl.decrease_scale();
+                      window.set_inner_size(new_size);
+                    }
+                  },
+                  _ => (),
+                }
+                *control_flow = ControlFlow::Poll;
+              },
+              _ => {
+                *control_flow = ControlFlow::Poll;
+              },
+            }
           }
         },
         Event::MainEventsCleared => {
@@ -88,4 +115,6 @@ impl super::Shell for WindowShell {
 
 pub trait VideoImpl {
   fn draw_lcd(&mut self, lcd_data: &[u8]);
+  fn increase_scale(&mut self) -> PhysicalSize<u32>;
+  fn decrease_scale(&mut self) -> PhysicalSize<u32>;
 }
