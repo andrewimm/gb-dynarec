@@ -24,6 +24,7 @@ pub struct VideoState {
   bg_palette_value: u8,
   object_palette_0: [u8; 4],
   object_palette_1: [u8; 4],
+  scroll_y: u8,
 
   current_mode: u8,
   current_mode_dots: usize,
@@ -50,6 +51,7 @@ impl VideoState {
       bg_palette_value: 0,
       object_palette_0: [0; 4],
       object_palette_1: [0; 4],
+      scroll_y: 0,
 
       // start at the beginning of a vblank
       current_mode: 1,
@@ -130,11 +132,11 @@ impl VideoState {
   }
 
   pub fn set_scroll_y(&mut self, value: u8) {
-
+    self.scroll_y = value;
   }
 
   pub fn get_scroll_y(&self) -> u8 {
-    0
+    self.scroll_y
   }
 
   pub fn get_ly(&self) -> u8 {
@@ -191,8 +193,7 @@ impl VideoState {
 
   fn cache_next_tile_row(&mut self, vram: &Box<[u8]>) {
     let tile_x = self.next_cached_tile_x;
-    // TODO: account for scroll y
-    let relative_tile_line = self.current_line as usize;
+    let relative_tile_line = self.current_line.wrapping_add(self.scroll_y) as usize;
     let tile_y = relative_tile_line >> 3;
     let tile_index = self.get_bg_tile(tile_x, tile_y, vram) as usize;
     let tile_row = relative_tile_line & 7;

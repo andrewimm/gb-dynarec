@@ -4,8 +4,8 @@ pub struct LCD {
   enabled: bool,
 }
 
-const LCD_WIDTH: usize = 160;
-const LCD_HEIGHT: usize = 144;
+pub const LCD_WIDTH: usize = 160;
+pub const LCD_HEIGHT: usize = 144;
 const LCD_SIZE: usize = LCD_WIDTH * LCD_HEIGHT;
 
 impl LCD {

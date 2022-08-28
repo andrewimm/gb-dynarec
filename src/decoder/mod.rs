@@ -377,7 +377,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       (op, 2, 12)
     },
     0xe1 => (Op::Pop(Register16::HL), 1, 12),
-    0xe2 => (Op::LoadToHighMem, 2, 8),
+    0xe2 => (Op::LoadToHighMem, 1, 8),
     // e3 invalid
     // e4 invalid
     0xe5 => (Op::Push(Register16::HL), 1, 12),
@@ -415,7 +415,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
       (op, 2, 12)
     },
     0xf1 => (Op::Pop(Register16::AF), 1, 12),
-    0xf2 => (Op::LoadFromHighMem, 2, 8),
+    0xf2 => (Op::LoadFromHighMem, 1, 8),
     0xf3 => (Op::InterruptDisable, 1, 4),
     // f4 invalid
     0xf5 => (Op::Push(Register16::AF), 1, 12),

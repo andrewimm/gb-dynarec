@@ -34,7 +34,7 @@ impl MemoryAreas {
       } else if i == rom_code.len() {
         rom.push(0x76);
       } else {
-        rom.push(0);
+        rom.push(0xff);
       }
     }
     let mut work_ram = Vec::<u8>::with_capacity(0x1000);
@@ -53,7 +53,7 @@ impl MemoryAreas {
       video_ram: video_ram.into_boxed_slice(),
       cart_ram: vec![].into_boxed_slice(),
       work_ram: work_ram.into_boxed_slice(),
-      high_ram: vec![].into_boxed_slice(),
+      high_ram: create_buffer(127),
 
       rom_bank: 1,
       vram_bank: 0,
