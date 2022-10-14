@@ -305,7 +305,11 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     },
     0xc7 => (Op::ResetVector(0x00), 1, 16),
     0xc8 => (Op::Return(JumpCondition::Zero), 1, 8),
-    0xc9 => (Op::Return(JumpCondition::Always), 1, 16),
+    0xc9 => (
+      Op::Return(JumpCondition::Always),
+      1,
+      4, // The return implementation will always add 12 cycles, for 16 total
+    ),
     0xca => {
       let addr = read_u16(&instructions[1..]);
       let op = Op::Jump(JumpCondition::Zero, addr);
@@ -320,7 +324,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0xcd => {
       let addr = read_u16(&instructions[1..]);
       let op = Op::Call(JumpCondition::Always, addr);
-      (op, 3, 24)
+      (op, 3, 12) // The implementation will add 12 cycles on jump, for 24 total
     },
     0xce => {
       let value = instructions[1];
