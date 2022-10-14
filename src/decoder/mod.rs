@@ -384,7 +384,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0xe2 => (Op::LoadToHighMem, 1, 8),
     // e3 invalid
     // e4 invalid
-    0xe5 => (Op::Push(Register16::HL), 1, 12),
+    0xe5 => (Op::Push(Register16::HL), 1, 16),
     0xe6 => {
       let value = instructions[1];
       let op = Op::AndAbsolute8(value);
@@ -422,7 +422,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0xf2 => (Op::LoadFromHighMem, 1, 8),
     0xf3 => (Op::InterruptDisable, 1, 4),
     // f4 invalid
-    0xf5 => (Op::Push(Register16::AF), 1, 12),
+    0xf5 => (Op::Push(Register16::AF), 1, 16),
     0xf6 => {
       let value = instructions[1];
       let op = Op::OrAbsolute8(value);
@@ -530,7 +530,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x43 => (Op::BitTest(Register8::E, 0x01), 2, 8),
     0x44 => (Op::BitTest(Register8::H, 0x01), 2, 8),
     0x45 => (Op::BitTest(Register8::L, 0x01), 2, 8),
-    0x46 => (Op::BitTestIndirect(0x01), 2, 16),
+    0x46 => (Op::BitTestIndirect(0x01), 2, 12),
     0x47 => (Op::BitTest(Register8::A, 0x01), 2, 8),
     0x48 => (Op::BitTest(Register8::B, 0x02), 2, 8),
     0x49 => (Op::BitTest(Register8::C, 0x02), 2, 8),
@@ -538,7 +538,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x4b => (Op::BitTest(Register8::E, 0x02), 2, 8),
     0x4c => (Op::BitTest(Register8::H, 0x02), 2, 8),
     0x4d => (Op::BitTest(Register8::L, 0x02), 2, 8),
-    0x4e => (Op::BitTestIndirect(0x02), 2, 16),
+    0x4e => (Op::BitTestIndirect(0x02), 2, 12),
     0x4f => (Op::BitTest(Register8::A, 0x02), 2, 8),
 
     0x50 => (Op::BitTest(Register8::B, 0x04), 2, 8),
@@ -547,7 +547,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x53 => (Op::BitTest(Register8::E, 0x04), 2, 8),
     0x54 => (Op::BitTest(Register8::H, 0x04), 2, 8),
     0x55 => (Op::BitTest(Register8::L, 0x04), 2, 8),
-    0x56 => (Op::BitTestIndirect(0x04), 2, 16),
+    0x56 => (Op::BitTestIndirect(0x04), 2, 12),
     0x57 => (Op::BitTest(Register8::A, 0x04), 2, 8),
     0x58 => (Op::BitTest(Register8::B, 0x08), 2, 8),
     0x59 => (Op::BitTest(Register8::C, 0x08), 2, 8),
@@ -555,7 +555,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x5b => (Op::BitTest(Register8::E, 0x08), 2, 8),
     0x5c => (Op::BitTest(Register8::H, 0x08), 2, 8),
     0x5d => (Op::BitTest(Register8::L, 0x08), 2, 8),
-    0x5e => (Op::BitTestIndirect(0x08), 2, 16),
+    0x5e => (Op::BitTestIndirect(0x08), 2, 12),
     0x5f => (Op::BitTest(Register8::A, 0x08), 2, 8),
 
     0x60 => (Op::BitTest(Register8::B, 0x10), 2, 8),
@@ -564,7 +564,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x63 => (Op::BitTest(Register8::E, 0x10), 2, 8),
     0x64 => (Op::BitTest(Register8::H, 0x10), 2, 8),
     0x65 => (Op::BitTest(Register8::L, 0x10), 2, 8),
-    0x66 => (Op::BitTestIndirect(0x10), 2, 16),
+    0x66 => (Op::BitTestIndirect(0x10), 2, 12),
     0x67 => (Op::BitTest(Register8::A, 0x10), 2, 8),
     0x68 => (Op::BitTest(Register8::B, 0x20), 2, 8),
     0x69 => (Op::BitTest(Register8::C, 0x20), 2, 8),
@@ -572,7 +572,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x6b => (Op::BitTest(Register8::E, 0x20), 2, 8),
     0x6c => (Op::BitTest(Register8::H, 0x20), 2, 8),
     0x6d => (Op::BitTest(Register8::L, 0x20), 2, 8),
-    0x6e => (Op::BitTestIndirect(0x20), 2, 16),
+    0x6e => (Op::BitTestIndirect(0x20), 2, 12),
     0x6f => (Op::BitTest(Register8::A, 0x20), 2, 8),
 
     0x70 => (Op::BitTest(Register8::B, 0x40), 2, 8),
@@ -581,7 +581,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x73 => (Op::BitTest(Register8::E, 0x40), 2, 8),
     0x74 => (Op::BitTest(Register8::H, 0x40), 2, 8),
     0x75 => (Op::BitTest(Register8::L, 0x40), 2, 8),
-    0x76 => (Op::BitTestIndirect(0x40), 2, 16),
+    0x76 => (Op::BitTestIndirect(0x40), 2, 12),
     0x77 => (Op::BitTest(Register8::A, 0x40), 2, 8),
     0x78 => (Op::BitTest(Register8::B, 0x80), 2, 8),
     0x79 => (Op::BitTest(Register8::C, 0x80), 2, 8),
@@ -589,7 +589,7 @@ fn decode_cb(instructions: &[u8]) -> (Op, usize, usize) {
     0x7b => (Op::BitTest(Register8::E, 0x80), 2, 8),
     0x7c => (Op::BitTest(Register8::H, 0x80), 2, 8),
     0x7d => (Op::BitTest(Register8::L, 0x80), 2, 8),
-    0x7e => (Op::BitTestIndirect(0x80), 2, 16),
+    0x7e => (Op::BitTestIndirect(0x80), 2, 12),
     0x7f => (Op::BitTest(Register8::A, 0x80), 2, 8),
 
     0x80 => (Op::BitClear(Register8::B, 0x01), 2, 8),
