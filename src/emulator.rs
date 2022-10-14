@@ -82,7 +82,7 @@ impl Core {
 
     self.memory.io.interrupt_flag.clear(clear);
     // for timing accuracy, skip five machine cycles
-
+    self.registers.cycles += 5;
 
     self.push_ip();
     self.interrupts_enabled = InterruptState::Disabled;
