@@ -56,7 +56,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0x18 => {
       let offset = instructions[1] as i8;
       let op = Op::JumpRelative(JumpCondition::Always, offset);
-      (op, 2, 12)
+      (op, 2, 8) // 4 will be added with the actual jump
     },
     0x19 => (Op::AddHL(Register16::DE), 1, 8),
     0x1a => (Op::LoadFromIndirect(Register8::A, IndirectLocation::DE), 1, 8),
@@ -73,7 +73,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0x20 => {
       let offset = instructions[1] as i8;
       let op = Op::JumpRelative(JumpCondition::NonZero, offset);
-      (op, 2, 12)
+      (op, 2, 8)
     },
     0x21 => {
       let value = read_u16(&instructions[1..]);
@@ -93,7 +93,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0x28 => {
       let offset = instructions[1] as i8;
       let op = Op::JumpRelative(JumpCondition::Zero, offset);
-      (op, 2, 12)
+      (op, 2, 8)
     },
     0x29 => (Op::AddHL(Register16::HL), 1, 8),
     0x2a => (Op::LoadFromIndirect(Register8::A, IndirectLocation::HLIncrement), 1, 8),
@@ -110,7 +110,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0x30 => {
       let offset = instructions[1] as i8;
       let op = Op::JumpRelative(JumpCondition::NoCarry, offset);
-      (op, 2, 12)
+      (op, 2, 8)
     },
     0x31 => {
       let value = read_u16(&instructions[1..]);
@@ -130,7 +130,7 @@ pub fn decode(instructions: &[u8]) -> (Op, usize, usize) {
     0x38 => {
       let offset = instructions[1] as i8;
       let op = Op::JumpRelative(JumpCondition::Carry, offset);
-      (op, 2, 12)
+      (op, 2, 8)
     },
     0x39 => (Op::AddHL(Register16::SP), 1, 8),
     0x3a => (Op::LoadFromIndirect(Register8::A, IndirectLocation::HLDecrement), 1, 8),

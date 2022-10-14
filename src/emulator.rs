@@ -2471,9 +2471,14 @@ mod tests {
 
   #[test]
   fn timer_cycles() {
+    // This test checks that the timer fires interrupts in an appropriate
+    // amount of time.
+    // After initializing the timer, it runs enough cycles to 
     let code = vec![
-      0x31, 0xf0, 0xc0, // LD SP, 0xc0f0
+      0x31, 0xf0, 0xcf, // LD SP, 0xcff0
       // $TAC = 0x05, enable and set speed to CPU/16
+      // With this setting, $TIMA will update every 16 clock cycles, and will
+      // overflow after 16 * 256 = 4096 cycles.
       0x3e, 0x05, // LD A, 0x05
       0xe0, 0x07, // LD (0xff00 + 0x07), A
       // $TIMA = 0
@@ -2482,21 +2487,21 @@ mod tests {
       // $IF = 0
       0x3e, 0x00, // LD A, 0x00
       0xe0, 0x0f, // LD (0xff00 + 0x0f), A
-      // Delay 500 cycles
-      0x0e, 124, // LD C, 124
-      0x0d, // DEC C
+      
+      0x0e, 0xfa, // LD C, 0xfa  ; 8 clock cycles
+      0x0d,       // DEC C       ; 4 clock cycles
+      0x20, 0xfd, // JR NZ, -3   ; 12 when taken
+      0x00, 0x00, // NOP NOP     ; 8 clock cycles
+
+      0x0e, 0x10, // LD C, 0x10
+      0x0d,       // DEC C
       0x20, 0xff, // JR NZ, -1
-      0x00, 0x00,
+      0x00, 0x00, // NOP NOP
 
-      0x0e, 124,
-      0x0d,
-      0x20, 0xff,
-      0x00, 0x00,
-
-      0x0e, 124,
-      0x0d,
-      0x20, 0xff,
-      0x00, 0x00,
+      0x0e, 0x10, // LD C, 0x10
+      0x0d,       // DEC C
+      0x20, 0xff, // JR NZ, -1
+      0x00, 0x00, // NOP NOP
     ];
     let mut core = Core::with_code_block(code.into_boxed_slice());
     for _ in 0..1000 {
@@ -2505,6 +2510,7 @@ mod tests {
       }
       core.run_interp();
     }
+    assert_eq!(core.registers.get_ip(), 22);
     assert_eq!(core.memory.io.interrupt_flag.as_u8() & 0x04, 0);
     for _ in 0..1000 {
       if core.registers.get_ip() == 29 {
