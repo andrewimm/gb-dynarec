@@ -2,7 +2,7 @@ use crate::cache::CodeCache;
 use crate::cart::Header;
 use crate::cpu::{self, Registers};
 use crate::interpreter;
-use crate::mem::{MemoryAreas, memory_write_word};
+use crate::mem::{MemoryAreas, memory_write_byte, memory_write_word};
 use crate::timing::{ClockCycles, MachineCycles};
 use std::fs::File;
 
@@ -68,13 +68,42 @@ impl Core {
       InterruptState::Enabled => (),
       _ => return,
     }
-    let (vector, clear): (u32, u8) = if interrupts & 1 != 0 {
+
+    // Initiate the dispatch process
+    // The dispatch is not instantaneous. During this time, it's possible the
+    // flags can change.
+    self.interrupts_enabled = InterruptState::Disabled;
+
+    let old_ip = self.registers.ip as u16;
+    let old_ip_high = (self.registers.ip >> 8) as u8;
+    let old_ip_low = (self.registers.ip & 0xff) as u8;
+    let mem_ptr = &mut self.memory as *mut MemoryAreas;
+    // push high byte of IP
+    {
+      self.registers.sp = self.registers.sp.wrapping_sub(1);
+      let sp = self.registers.sp as u16;
+      memory_write_byte(mem_ptr, sp, old_ip_high);
+    }
+    let interrupts_updated = self.memory.io.get_active_interrupts();
+    // push low byte of IP
+    {
+      self.registers.sp = self.registers.sp.wrapping_sub(1);
+      let sp = self.registers.sp as u16;
+      memory_write_byte(mem_ptr, sp, old_ip_low);
+    }
+
+    let (vector, clear): (u32, u8) = if interrupts_updated == 0 {
+      // If the interrupt was cleared since the dispatch began, the original
+      // dispatch will cancel without being cleaned up, and the PC will jump
+      // to 0x0000.
+      (0x00, 0x00)
+    } else if interrupts_updated & 1 != 0 {
       (0x40, 0x01) // VBLANK
-    } else if interrupts & 2 != 0 {
+    } else if interrupts_updated & 2 != 0 {
       (0x48, 0x02) // LCD STAT
-    } else if interrupts & 4 != 0 {
+    } else if interrupts_updated & 4 != 0 {
       (0x50, 0x04) // timer
-    } else if interrupts & 8 != 0 {
+    } else if interrupts_updated & 8 != 0 {
       (0x58, 0x08) // serial transfer
     } else {
       (0x60, 0x10) // input
@@ -84,8 +113,6 @@ impl Core {
     // for timing accuracy, skip five machine cycles
     self.registers.cycles += 5;
 
-    self.push_ip();
-    self.interrupts_enabled = InterruptState::Disabled;
     self.registers.ip = vector;
   }
 
@@ -2101,6 +2128,34 @@ mod tests {
     core.run_code_block();
     assert_eq!(core.registers.get_sp(), 0xc100);
     assert_eq!(core.registers.get_af(), 0x1450);
+  }
+
+
+  #[test]
+  fn push_wrap() {
+    let code = vec![
+      0x3e, 0x00, // LD A, 0x00
+      0xe0, 0xff, // LD (0xff00 + 0xff), A
+      0x31, 0x00, 0x00, // LD SP, 0x0000
+      0x06, 0xaa, // LD B, 0xaa
+      0x0e, 0x02, // LD C, 0x02 
+      0xc5, // PUSH BC
+    
+      0x31, 0x01, 0x00, // LD SP, 0x0001
+      0xc5, // PUSH BC
+    ];
+    let mut core = Core::with_code_block(code.into_boxed_slice());
+    core.run_interp();
+    core.run_interp();
+    core.run_interp();
+    core.run_interp();
+    core.run_interp();
+    core.run_interp();
+    assert_eq!(core.memory.io.interrupt_mask, 0x0a);
+
+    core.run_interp();
+    core.run_interp();
+    assert_eq!(core.memory.io.interrupt_mask, 0x02);
   }
 
   #[test]
