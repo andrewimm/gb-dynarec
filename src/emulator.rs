@@ -129,13 +129,13 @@ impl Core {
   /// Run the next code block, then check for interrupts
   pub fn run_code_block(&mut self) {
     // if running in interpreted mode, disable any dynamic compilation
-    #[cfg(feature = "interp")]
+    #[cfg(not(feature = "jit"))]
     let result = {
       let mem_ptr = &mut self.memory as *mut MemoryAreas;
       interpreter::run_code_block(&mut self.registers, mem_ptr)
     };
     // otherwise, use the code cache and dynarec
-    #[cfg(not(feature = "interp"))]
+    #[cfg(feature = "jit")]
     let result = {
       let address = {
         let ip = self.registers.ip as usize;
@@ -177,7 +177,7 @@ impl Core {
     self.handle_interrupt();
 
     // only invalidate cache in dynarec mode
-    #[cfg(not(feature = "interp"))]
+    #[cfg(feature = "jit")]
     {
       if self.memory.wram_dirty {
         // may need to invalidate a cache block
@@ -258,12 +258,12 @@ impl Core {
   pub fn update(&mut self) {
     match self.run_state {
       RunState::Run => {
-        #[cfg(feature = "interp")]
+        #[cfg(not(feature = "jit"))]
         {
           self.run_interp();
         }
 
-        #[cfg(not(feature = "interp"))]
+        #[cfg(feature = "jit")]
         {
           self.run_code_block();
         }
