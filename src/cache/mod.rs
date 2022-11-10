@@ -84,14 +84,14 @@ impl CodeCache {
         let offset = (ip & 0x3fff) + bank_start;
         &mem.rom[offset..bank_end]
       },
-      0xc000..=0xcfff => &mem.work_ram[(ip & 0xfff)..0x1000],
-      0xd000..=0xdfff => {
-        let bank_start = mem.wram_bank * 0x1000;
-        let bank_end = bank_start + 0x1000;
-        let offset = (ip & 0xfff) + bank_start;
-        &mem.work_ram[offset..bank_end]
-      },
-      0xff80..=0xfffe => &mem.high_ram[(ip & 0x7f)..],
+      //0xc000..=0xcfff => &mem.work_ram[(ip & 0xfff)..0x1000],
+      //0xd000..=0xdfff => {
+      //  let bank_start = mem.wram_bank * 0x1000;
+      //  let bank_end = bank_start + 0x1000;
+      //  let offset = (ip & 0xfff) + bank_start;
+      //  &mem.work_ram[offset..bank_end]
+      //},
+      //0xff80..=0xfffe => &mem.high_ram[(ip & 0x7f)..],
       _ => panic!("TRIED TO EXECUTE {:X}", ip),
     }
   }

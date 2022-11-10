@@ -2,7 +2,7 @@ use crate::cache::CodeCache;
 use crate::cart::Header;
 use crate::cpu::{self, Registers};
 use crate::interpreter;
-use crate::mem::{MemoryAreas, memory_write_byte, memory_write_word};
+use crate::mem::{MemoryAreas, can_dynarec, memory_write_byte, memory_write_word};
 use crate::timing::{ClockCycles, MachineCycles};
 use std::fs::File;
 
@@ -137,16 +137,24 @@ impl Core {
     // otherwise, use the code cache and dynarec
     #[cfg(feature = "jit")]
     let result = {
-      let address = {
-        let ip = self.registers.ip as usize;
-        let found_address = self.cache.get_address_for_ip(ip);
-        if let Some(addr) = found_address {
-          addr
-        } else {
-          self.cache.translate_code_block(&self.memory.rom, ip, self.memory.as_ptr())
-        }
-      };
-      self.cache.call(address, &mut self.registers)
+      let ip = self.registers.ip as usize;
+      // Since RAM is invalidated by writes, it's messy to compile and track
+      // code found in RAM. Only ROM code should be recompiled, the rest
+      // should be interpreted.
+      if can_dynarec(ip) {
+        let address = {
+          let found_address = self.cache.get_address_for_ip(ip);
+          if let Some(addr) = found_address {
+            addr
+          } else {
+            self.cache.translate_code_block(&self.memory.rom, ip, self.memory.as_ptr())
+          }
+        };
+        self.cache.call(address, &mut self.registers)
+      } else {
+        let mem_ptr = &mut self.memory as *mut MemoryAreas;
+        interpreter::run_code_block(&mut self.registers, mem_ptr)
+      }
     };
 
     // for all modes, update the processor state and "catch up" all peripherals
@@ -175,29 +183,6 @@ impl Core {
     // catch up memmapped devices
     self.memory.run_clock_cycles(cycles_consumed.to_clock_cycles());
     self.handle_interrupt();
-
-    // only invalidate cache in dynarec mode
-    #[cfg(feature = "jit")]
-    {
-      if self.memory.wram_dirty {
-        // may need to invalidate a cache block
-        self.cache.invalidate_dirty_wram(&self.memory.wram_dirty_flags);
-
-        // clear all dirty flags
-        for i in 0..64 {
-          self.memory.wram_dirty_flags[i] = 0;
-        }
-        self.memory.wram_dirty = false;
-      }
-      if self.memory.hram_dirty {
-        self.cache.invalidate_dirty_hram(&self.memory.hram_dirty_flags);
-        for i in 0..2 {
-          self.memory.hram_dirty_flags[i] = 0;
-        }
-        self.memory.hram_dirty = false;
-      }
-    }
-    //println!("[{}] {:?}", result, self.registers);
   }
 
   pub fn run_interp(&mut self) {
