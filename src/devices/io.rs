@@ -72,7 +72,8 @@ impl IO {
       0x06 => self.timer.get_modulo(),
       0x07 => self.timer.get_timer_control(),
 
-      0x0f => self.interrupt_flag.as_u8(),
+      // unconnected lines should be tied high
+      0x0f => self.interrupt_flag.as_u8() | 0xe0,
 
       0x40 => self.video.get_lcd_control(),
       0x41 => self.video.get_lcd_status(),
