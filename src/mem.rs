@@ -8,6 +8,7 @@ pub struct MemoryAreas {
   pub video_ram: Box<[u8]>,
   pub cart_ram: Box<[u8]>,
   pub work_ram: Box<[u8]>,
+  pub oam_ram: Box<[u8]>,
   pub high_ram: Box<[u8]>,
 
   pub rom_bank: usize,
@@ -17,7 +18,18 @@ pub struct MemoryAreas {
 
   pub io: IO,
 
+  pub oam_dma: Option<DMAState>,
+
   rom_mapped: bool,
+}
+
+/// Stores the state of an active DMA procedure
+#[derive(Copy, Clone)]
+pub struct DMAState {
+  // Location to begin copying memory from, aligned to the nearest 0x100
+  source: usize,
+  // OAM DMA is 0xa0 bytes long. This stores the offset to be copied next.
+  current_offset: u8,
 }
 
 impl MemoryAreas {
@@ -46,6 +58,7 @@ impl MemoryAreas {
       video_ram: video_ram.into_boxed_slice(),
       cart_ram: vec![].into_boxed_slice(),
       work_ram: work_ram.into_boxed_slice(),
+      oam_ram: create_buffer(0xa0),
       high_ram: create_buffer(127),
 
       rom_bank: 1,
@@ -54,6 +67,8 @@ impl MemoryAreas {
       wram_bank: 1,
 
       io: IO::new(),
+
+      oam_dma: None,
 
       rom_mapped: false,
     }
@@ -69,6 +84,7 @@ impl MemoryAreas {
     let video_ram = create_buffer(video_ram_size);
     let cart_ram = create_buffer(cart_ram_size);
     let work_ram = create_buffer(work_ram_size);
+    let oam_ram = create_buffer(0xa0);
     let high_ram = create_buffer(127);
 
     Self {
@@ -76,6 +92,7 @@ impl MemoryAreas {
       video_ram,
       cart_ram,
       work_ram,
+      oam_ram,
       high_ram,
       rom_bank: 1,
       vram_bank: 0,
@@ -83,6 +100,7 @@ impl MemoryAreas {
       wram_bank: 1,
 
       io: IO::new(),
+      oam_dma: None,
 
       rom_mapped: true,
     }
@@ -93,6 +111,40 @@ impl MemoryAreas {
   }
 
   pub fn run_clock_cycles(&mut self, cycles: ClockCycles) {
+    // If a DMA is currently active, it updates with the rest of the memory bus
+    // One byte is copied on each machine cycle. This will copy at most that
+    // many bytes (or fewer, if the DMA completes before then).
+    if let Some(dma) = self.oam_dma {
+      let source = dma.source;
+      let mut current_offset = dma.current_offset as usize;
+
+      let bytes_remaining = 0xa0 - current_offset;
+      let cycles_to_copy = cycles.as_usize() / 4;
+      let mut bytes_to_copy = bytes_remaining.min(cycles_to_copy);
+
+      while bytes_to_copy > 0 {
+        // copy DMA byte
+        let source = source + current_offset;
+
+        let value = memory_read_byte(self as *mut MemoryAreas, source as u16);
+        let dest = 0xfe00 + current_offset as u16;
+        memory_write_byte(self as *mut MemoryAreas, dest, value);
+
+        bytes_to_copy -= 1;
+        current_offset += 1;
+      }
+      if current_offset < 0xa0 {
+        self.oam_dma = Some(
+          DMAState {
+            source,
+            current_offset: current_offset as u8,
+          }
+        );
+      } else {
+        self.oam_dma = None;
+      }
+    }
+
     self.io.run_clock_cycles(cycles, &self.video_ram);
   }
 }
@@ -167,13 +219,18 @@ pub extern "sysv64" fn memory_read_byte(areas: *const MemoryAreas, addr: u16) ->
     return 0;
   }
   if addr < 0xfea0 { // OAM
-    return 0;
+    let offset = addr as usize & 0xff;
+    return memory_areas.oam_ram[offset];
   }
   if addr < 0xff00 { // unused
     return 0;
   }
   if addr < 0xff80 { // I/O
-    return memory_areas.io.get_byte(addr);
+    if addr == 0xff46 {
+      // TODO: OAM should return last written value
+    } else {
+      return memory_areas.io.get_byte(addr);
+    }
   }
   if addr == 0xffff { // Interrupt Mask
     return memory_areas.io.interrupt_mask;
@@ -214,13 +271,25 @@ pub extern "sysv64" fn memory_write_byte(areas: *mut MemoryAreas, addr: u16, val
     return;
   }
   if addr < 0xfea0 { // OAM
+    let offset = addr as usize & 0xff;
+    memory_areas.oam_ram[offset] = value;
     return;
   }
   if addr < 0xff00 { // unused
     return;
   }
   if addr < 0xff80 { // I/O
-    memory_areas.io.set_byte(addr, value);
+    if addr == 0xff46 {
+      let source = (value as usize) << 8;
+      memory_areas.oam_dma = Some(
+        DMAState {
+          source,
+          current_offset: 0,
+        }
+      );
+    } else {
+      memory_areas.io.set_byte(addr, value);
+    }
     return;
   }
   if addr == 0xffff { // Interrupt Mask
