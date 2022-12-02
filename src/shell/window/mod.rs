@@ -1,10 +1,12 @@
 use crate::emulator::Core;
+use crate::devices::joypad::Button;
 use raw_window_handle::{
   HasRawDisplayHandle,
   HasRawWindowHandle,
   RawDisplayHandle,
   RawWindowHandle,
 };
+use std::time::{Duration, SystemTime};
 use winit::{
   dpi::PhysicalSize,
   event::{ElementState, Event, VirtualKeyCode, WindowEvent},
@@ -59,7 +61,11 @@ impl super::Shell for WindowShell {
       _ => panic!("Unsupported platform"),
     };
 
+    let mut last_frame_time = SystemTime::now();
+
     event_loop.run(move |event, _, control_flow| {
+      *control_flow = ControlFlow::Poll;
+
       match event {
         Event::WindowEvent {
           event: e,
@@ -88,17 +94,37 @@ impl super::Shell for WindowShell {
                       window.set_inner_size(new_size);
                     }
                   },
+                  Some(code) => {
+                    if let KeyboardInput::Joypad(b) = KeyboardInput::from_raw_input(code) {
+                      if pressed {
+                        core.memory.io.joypad.press_button(b);
+                      } else {
+                        core.memory.io.joypad.release_button(b);
+                      }
+                    }
+                  },
                   _ => (),
                 }
-                *control_flow = ControlFlow::Poll;
               },
-              _ => {
-                *control_flow = ControlFlow::Poll;
-              },
+              _ => (),
             }
           }
         },
         Event::MainEventsCleared => {
+          let now = SystemTime::now();
+          let mut elapsed = match now.duration_since(last_frame_time) {
+            Ok(n) => n.as_millis(),
+            Err(_) => 1,
+          };
+          last_frame_time = now;
+
+          if elapsed < 16 {
+            let diff = 16 - elapsed;
+            let sleep_time = Duration::from_millis(diff as u64);
+            std::thread::sleep(sleep_time);
+            elapsed += diff;
+          }
+
           core.run_frame();
 
           // get latest lcd data
@@ -106,7 +132,7 @@ impl super::Shell for WindowShell {
           // draw lcd data to screen
           video_impl.draw_lcd(lcd_data);
         },
-        _ => *control_flow = ControlFlow::Poll,
+        _ => (),
       }
     });
 
@@ -117,4 +143,26 @@ pub trait VideoImpl {
   fn draw_lcd(&mut self, lcd_data: &[u8]);
   fn increase_scale(&mut self) -> PhysicalSize<u32>;
   fn decrease_scale(&mut self) -> PhysicalSize<u32>;
+}
+
+pub enum KeyboardInput {
+  Joypad(Button),
+  Unknown,
+}
+
+impl KeyboardInput {
+  pub fn from_raw_input(code: VirtualKeyCode) -> Self {
+    match code {
+      VirtualKeyCode::Z => KeyboardInput::Joypad(Button::B),
+      VirtualKeyCode::X => KeyboardInput::Joypad(Button::A),
+      VirtualKeyCode::Return => KeyboardInput::Joypad(Button::Start),
+      
+      VirtualKeyCode::Up => KeyboardInput::Joypad(Button::Up),
+      VirtualKeyCode::Left => KeyboardInput::Joypad(Button::Left),
+      VirtualKeyCode::Right => KeyboardInput::Joypad(Button::Right),
+      VirtualKeyCode::Down => KeyboardInput::Joypad(Button::Down),
+
+      _ => KeyboardInput::Unknown,
+    }
+  }
 }
