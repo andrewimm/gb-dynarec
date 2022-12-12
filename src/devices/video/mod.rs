@@ -1,6 +1,8 @@
 pub mod lcd;
 pub mod tile;
 
+use std::u8;
+
 use lcd::LCD;
 use crate::timing::ClockCycles;
 
@@ -195,6 +197,18 @@ impl VideoState {
     self.bg_palette_value
   }
 
+  pub fn set_obj_palette(&mut self, palette: u8, value: u8) {
+    let palette = if palette == 0 {
+      &mut self.object_palette_0
+    } else {
+      &mut self.object_palette_1
+    };
+    palette[0] = SHADES[(value & 3) as usize];
+    palette[1] = SHADES[((value >> 2) & 3) as usize];
+    palette[2] = SHADES[((value >> 4) & 3) as usize];
+    palette[3] = SHADES[((value >> 6) & 3) as usize];
+  }
+
   pub fn get_tile_address(&self, index: usize) -> usize {
     ((self.first_tile_offset + (index * 16)) & 0xfff)
       + self.tile_address_offset
@@ -214,7 +228,15 @@ impl VideoState {
     tile::interleave(low, high)
   }
 
-  fn find_current_line_sprites(&mut self, oam: &Box<[u8]>) {
+  pub fn get_object_row(&self, video_ram: &Box<[u8]>, tile_index: usize, row: usize) -> u16 {
+    let mut address = tile_index << 4;
+    address += row * 2;
+    let low = video_ram[address];
+    let high = video_ram[address + 1];
+    tile::interleave(low, high)
+  }
+
+  fn find_current_line_sprites(&mut self, video_ram: &Box<[u8]>, oam: &Box<[u8]>) {
     // clear the object line cache to start with a clean slate
     for i in 0..self.object_line_cache.len() {
       self.object_line_cache[i] = 0;
@@ -227,6 +249,7 @@ impl VideoState {
     while offset < 160 && objects_found.len() < 10 {
       let object_y = oam[offset] as isize;
       let object_x = oam[offset + 1];
+      let tile_index = oam[offset + 2] as usize;
       let attributes = oam[offset + 3];
       offset += 4;
       let object_line = current_line + 16 - object_y;
@@ -234,12 +257,14 @@ impl VideoState {
         continue;
       }
 
+      let row_data = self.get_object_row(video_ram, tile_index, object_line as usize);
+
       objects_found.push(
         Some(
           ObjectAttributes {
             has_priority: attributes & 0x80 != 0,
             palette: (attributes & 0x10) >> 4,
-            row_data: 0xffff,
+            row_data,
             x_coord: object_x,
           }
         )
@@ -251,25 +276,34 @@ impl VideoState {
       return;
     }
     let mut drawn_count = 0;
-    let mut i = 0;
-    while i < 168 && drawn_count < total_objects {
+    /// line_x sweeps across every pixel in the object line cache
+    /// The first 8 pixels won't be drawn to the screen, nor the pixels beyond
+    /// index 168.
+    let mut line_x = 0;
+    // At each pixel, seek through the objects on the current line until one is
+    // found starting on the current pixel. If one is located, its pixels are
+    // copied to the unpopulated pixels in the line cache. After that, the
+    // object is removed from the current set, so that future sweeps through
+    // the object list can ignore it.
+    while line_x < 168 && drawn_count < total_objects {
       for obj_index in 0..total_objects {
         let obj_found = objects_found.get(obj_index);
 
         let drawn = if let Some(Some(obj)) = obj_found {
-          if obj.x_coord != i {
+          if obj.x_coord != line_x {
             false
           } else {
-            // this object begins drawing at i
-            // draw pixels to object_line_cache
+            // this object begins drawing at line_x
+            // Copy enough data to object_line_cache to be rendered when the
+            // LCD line is actually drawn.
             let mut pixel_data = obj.row_data;
             for x in 0..8 {
-              let offset = (i as usize) + x;
+              let offset = (line_x as usize) + x;
               if self.object_line_cache[offset] & 0x80 == 0 {
                 let priority = if obj.has_priority { 0x40 } else { 0 };
                 let palette = obj.palette << 2;
-                let color_index = (pixel_data & 3) as u8;
-                pixel_data >>= 2;
+                let color_index = ((pixel_data >> 14) & 3) as u8;
+                pixel_data <<= 2;
                 self.object_line_cache[offset] = (
                   0x80 | // present
                   priority |
@@ -290,7 +324,7 @@ impl VideoState {
         }
       }
 
-      i += 1;
+      line_x += 1;
     }
   }
 
@@ -349,7 +383,7 @@ impl VideoState {
               interrupt_state |= self.check_mode_interrupt();
               interrupt_state |= self.check_current_line();
               // pre-compute up to 10 sprites that overlap the current line
-              self.find_current_line_sprites(oam);
+              self.find_current_line_sprites(vram, oam);
             } else {
               // On line 144, enter VBLANK and set appropriate flags
               self.current_mode = 1;
@@ -373,7 +407,7 @@ impl VideoState {
               self.current_line = 0;
               self.current_mode = 2;
               // pre-compute up to 10 sprites that overlap the current line
-              self.find_current_line_sprites(oam);
+              self.find_current_line_sprites(vram, oam);
               interrupt_state |= self.check_mode_interrupt();
             }
           }
@@ -420,15 +454,15 @@ impl VideoState {
                 let bg_color = self.bg_palette[palette_index as usize];
 
                 // TODO: sort out sprite priority with bg
-                if object_pixel & 0x80 != 0 /*&& object_pixel & 3 != 0*/ {
+                if object_pixel & 0x80 != 0 && object_pixel & 3 != 0 {
                   // sprite is present
-                  let palette = if object_pixel & 0x40 != 0 {
+                  let palette = if object_pixel & 0x40 == 0 {
                     self.object_palette_0
                   } else {
                     self.object_palette_1
                   };
                   let obj_color = palette[(object_pixel & 3) as usize];
-                  current_line_buffer[current_write_index] = 0x33;
+                  current_line_buffer[current_write_index] = obj_color;
                 } else {
                   current_line_buffer[current_write_index] = bg_color;
                 }

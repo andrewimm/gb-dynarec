@@ -57,6 +57,8 @@ impl IO {
       },
 
       0x47 => self.video.set_bgp(value),
+      0x48 => self.video.set_obj_palette(0, value),
+      0x49 => self.video.set_obj_palette(1, value),
 
       _ => (),
     }
