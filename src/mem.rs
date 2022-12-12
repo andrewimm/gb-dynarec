@@ -145,7 +145,7 @@ impl MemoryAreas {
       }
     }
 
-    self.io.run_clock_cycles(cycles, &self.video_ram);
+    self.io.run_clock_cycles(cycles, &self.video_ram, &self.oam_ram);
   }
 }
 

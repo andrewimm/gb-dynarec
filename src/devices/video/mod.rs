@@ -8,6 +8,13 @@ use super::interrupts::InterruptFlag;
 
 const SHADES: [u8; 4] = [255, 170, 85, 0];
 
+struct ObjectAttributes {
+  pub palette: u8,
+  pub x_coord: u8,
+  pub row_data: u16,
+  pub has_priority: bool,
+}
+
 pub struct VideoState {
   lcd: LCD,
   tile_address_offset: usize,
@@ -31,6 +38,24 @@ pub struct VideoState {
   current_line: u8,
   next_cached_tile_x: usize,
   current_tile_cache: u16,
+
+  /// At the beginning of each line, the objects for that line are pre-cached.
+  /// The pixels are drawn into this buffer, where each byte represents a
+  /// single object pixel in the following 8-bit format:
+  ///
+  ///   7         6          5        4 3 2     1 0
+  /// -------------------------------------------------------
+  /// | present | priority | unused | palette | color index |
+  ///
+  /// A `present` pixel should not be overdrawn by another object
+  /// `priority` determines whether the sprite appears above or behind the BG
+  /// `palette` selects the color palette (0-7 for CGB, 0-1 for DMG)
+  /// `color index` determines which pixel is selected from the palette
+  /// 
+  /// To simplify drawing sprites that are partially off the screen, an
+  /// additional 8 pixels are added before and after the visible buffer.
+  object_line_cache: [u8; 176],
+  current_obj_line_cache_pixel: usize,
 }
 
 impl VideoState {
@@ -59,6 +84,8 @@ impl VideoState {
       current_line: 144,
       next_cached_tile_x: 0,
       current_tile_cache: 0,
+      object_line_cache: [0; 176],
+      current_obj_line_cache_pixel: 0,
     }
   }
 
@@ -187,8 +214,84 @@ impl VideoState {
     tile::interleave(low, high)
   }
 
-  fn find_current_line_sprites(&mut self) {
+  fn find_current_line_sprites(&mut self, oam: &Box<[u8]>) {
+    // clear the object line cache to start with a clean slate
+    for i in 0..self.object_line_cache.len() {
+      self.object_line_cache[i] = 0;
+    }
+    self.current_obj_line_cache_pixel = 8;
+    let current_line = self.current_line as isize;
+    // iterate over all objects in OAM (every 4 bytes)
+    let mut objects_found: Vec<Option<ObjectAttributes>> = Vec::with_capacity(10);
+    let mut offset = 0;
+    while offset < 160 && objects_found.len() < 10 {
+      let object_y = oam[offset] as isize;
+      let object_x = oam[offset + 1];
+      let attributes = oam[offset + 3];
+      offset += 4;
+      let object_line = current_line + 16 - object_y;
+      if object_line < 0 || object_line >= 8 {
+        continue;
+      }
 
+      objects_found.push(
+        Some(
+          ObjectAttributes {
+            has_priority: attributes & 0x80 != 0,
+            palette: (attributes & 0x10) >> 4,
+            row_data: 0xffff,
+            x_coord: object_x,
+          }
+        )
+      );
+    }
+
+    let total_objects = objects_found.len();
+    if total_objects == 0 {
+      return;
+    }
+    let mut drawn_count = 0;
+    let mut i = 0;
+    while i < 168 && drawn_count < total_objects {
+      for obj_index in 0..total_objects {
+        let obj_found = objects_found.get(obj_index);
+
+        let drawn = if let Some(Some(obj)) = obj_found {
+          if obj.x_coord != i {
+            false
+          } else {
+            // this object begins drawing at i
+            // draw pixels to object_line_cache
+            let mut pixel_data = obj.row_data;
+            for x in 0..8 {
+              let offset = (i as usize) + x;
+              if self.object_line_cache[offset] & 0x80 == 0 {
+                let priority = if obj.has_priority { 0x40 } else { 0 };
+                let palette = obj.palette << 2;
+                let color_index = (pixel_data & 3) as u8;
+                pixel_data >>= 2;
+                self.object_line_cache[offset] = (
+                  0x80 | // present
+                  priority |
+                  palette |
+                  color_index
+                );
+              }
+            }
+            drawn_count += 1;
+            true
+          }
+        } else {
+          false
+        };
+        if drawn {
+          // remove the object from the set
+          let _ = objects_found.get_mut(obj_index).take();
+        }
+      }
+
+      i += 1;
+    }
   }
 
   fn cache_next_tile_row(&mut self, vram: &Box<[u8]>) {
@@ -222,7 +325,7 @@ impl VideoState {
     }
   }
 
-  pub fn run_clock_cycles(&mut self, cycles: ClockCycles, vram: &Box<[u8]>) -> InterruptFlag {
+  pub fn run_clock_cycles(&mut self, cycles: ClockCycles, vram: &Box<[u8]>, oam: &Box<[u8]>) -> InterruptFlag {
     let mut cycles_remaining = cycles.as_usize();
     let mut interrupt_state = InterruptFlag::empty();
     while cycles_remaining > 0 {
@@ -246,7 +349,7 @@ impl VideoState {
               interrupt_state |= self.check_mode_interrupt();
               interrupt_state |= self.check_current_line();
               // pre-compute up to 10 sprites that overlap the current line
-              self.find_current_line_sprites();
+              self.find_current_line_sprites(oam);
             } else {
               // On line 144, enter VBLANK and set appropriate flags
               self.current_mode = 1;
@@ -270,7 +373,7 @@ impl VideoState {
               self.current_line = 0;
               self.current_mode = 2;
               // pre-compute up to 10 sprites that overlap the current line
-              self.find_current_line_sprites();
+              self.find_current_line_sprites(oam);
               interrupt_state |= self.check_mode_interrupt();
             }
           }
@@ -308,10 +411,27 @@ impl VideoState {
             loop {
               let current_line_buffer = self.lcd.get_writing_buffer_line(self.current_line as usize);
               while tile_x < 8 && dots_remaining > 0 {
+                // fetch a pixel out of the object line cache
+                let object_pixel = self.object_line_cache[self.current_obj_line_cache_pixel];
+                self.current_obj_line_cache_pixel += 1;
+
                 // shift a pixel out of the current tile cache
                 let palette_index = ((self.current_tile_cache & 0xc000) >> 14) as u8;
-                let color = self.bg_palette[palette_index as usize];
-                current_line_buffer[current_write_index] = color;
+                let bg_color = self.bg_palette[palette_index as usize];
+
+                // TODO: sort out sprite priority with bg
+                if object_pixel & 0x80 != 0 /*&& object_pixel & 3 != 0*/ {
+                  // sprite is present
+                  let palette = if object_pixel & 0x40 != 0 {
+                    self.object_palette_0
+                  } else {
+                    self.object_palette_1
+                  };
+                  let obj_color = palette[(object_pixel & 3) as usize];
+                  current_line_buffer[current_write_index] = 0x33;
+                } else {
+                  current_line_buffer[current_write_index] = bg_color;
+                }
 
                 self.current_tile_cache <<= 2;
                 tile_x += 1;

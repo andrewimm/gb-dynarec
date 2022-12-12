@@ -98,9 +98,9 @@ impl IO {
   /// Since many of the devices run in terms of clock cycles, not machine (cpu)
   /// cycles, the submitted number of cycles should be 4x the number of machine
   /// cycles that have passed.
-  pub fn run_clock_cycles(&mut self, cycles: ClockCycles, vram: &Box<[u8]>) {
+  pub fn run_clock_cycles(&mut self, cycles: ClockCycles, vram: &Box<[u8]>, oam: &Box<[u8]>) {
     let mut flags = self.timer.run_cycles(cycles);
-    flags |= self.video.run_clock_cycles(cycles, vram);
+    flags |= self.video.run_clock_cycles(cycles, vram, oam);
     flags |= self.joypad.get_interrupt();
 
     self.interrupt_flag |= flags;

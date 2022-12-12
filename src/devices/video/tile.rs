@@ -1,5 +1,5 @@
 /// Fast-interleave of two 8-bit numbers using 64-bit multiplication.
-/// This only requires 11 CPU operations to compute the result
+/// This only requires 11 arithmetic operations to compute the result
 #[inline(always)]
 pub fn interleave(low: u8, high: u8) -> u16 {
   let mut acc_high = (high as u64).wrapping_mul(0x0101010101010101u64);
