@@ -10,57 +10,34 @@ use crate::bindings::{
     BitBlt,
     CreateCompatibleDC,
     CreateDIBSection,
-    DeleteObject,
     GetDC,
     ReleaseDC,
     SelectObject,
   },
 };
-use crate::emulator::Core;
-use super::super::Shell;
-use std::time::Duration;
+use raw_window_handle::Win32WindowHandle;
+use super::VideoImpl;
 use winit::{
   dpi::PhysicalSize,
-  event::{Event, WindowEvent},
-  event_loop::{ControlFlow, EventLoop},
-  platform::windows::WindowExtWindows,
-  window::WindowBuilder,
 };
 
-pub struct WindowShell {
+pub struct Video {
   scale: usize,
+  hwnd: HWND,
+  bitmap: HBITMAP,
+  bitmap_raw_ptr: *mut u8,
+  bitmap_length: usize,
 }
 
-impl WindowShell {
-  pub fn new() -> Self {
-    Self {
-      scale: 4,
-    }
-  }
+impl Video {
+  pub fn new(window_handle: Win32WindowHandle) -> Self {
+    let scale = super::INITIAL_SCALE;
 
-  pub fn get_width(&self) -> f64 {
-    self.scale as f64 * 160.0
-  }
+    let row_size = ((160 * scale * 24 + 31) / 32) * 4;
+    let image_size = row_size * 144 * scale;
 
-  pub fn get_height(&self) -> f64 {
-    self.scale as f64 * 144.0
-  }
-}
-
-impl Shell for WindowShell {
-  fn run(&mut self, mut core: Core) {
-    let event_loop = EventLoop::new();
-    let window = WindowBuilder::new()
-      .with_title("gb-dynarec")
-      .with_inner_size(PhysicalSize::new(self.get_width(), self.get_height()))
-      .build(&event_loop)
-      .expect("Failed to initialize window");
-    
-    let scale = self.scale;
-
-    let hwnd = HWND(window.hwnd() as isize);
-    
-    let (bitmap, bitmap_memory) = unsafe {
+    let hwnd = HWND(window_handle.hwnd as isize);
+    let (bitmap, bitmap_raw_ptr) = unsafe {
       use std::ffi::c_void;
 
       let mut info: BITMAPINFO = std::mem::zeroed();
@@ -82,67 +59,67 @@ impl Shell for WindowShell {
         0,
       );
 
-      let row_size = ((160 * scale * 24 + 31) / 32) * 4;
-      let image_size = row_size * 144 * scale;
-      let image_slice: &mut [u8] = std::slice::from_raw_parts_mut(bits_ptr as *mut u8, image_size);
-
-      (bitmap, image_slice)
+      (bitmap, bits_ptr as *mut u8)
     };
-    
-    event_loop.run(move |event, _, control_flow| {
-      match event {
-        Event::WindowEvent {
-          event: WindowEvent::CloseRequested,
-          window_id,
-        } => {
-          if window_id == window.id() {
-            // clean up?
-            
-            *control_flow = ControlFlow::Exit;
-          }
-        },
-        Event::MainEventsCleared => {
-          core.run_frame();
 
-          let lcd_data = core.get_screen_buffer();
-          copy_lcd(bitmap_memory, lcd_data, scale);
-          unsafe {
-            draw(hwnd, bitmap, scale);
-          }
-        },
-        _ => *control_flow = ControlFlow::Poll,
-      }
-    });
-  }
-}
-
-pub fn copy_lcd(bitmap_memory: &mut [u8], lcd_data: &Box<[u8]>, scale: usize) {
-  let width = 160 * scale;
-  let row_size = ((width * 24 + 31) / 32) * 4;
-
-  for x in 0..(160 * scale) {
-    for y in 0..(144 * scale) {
-      let src_x = x / scale;
-      let src_y = y / scale;
-      let src_index = src_y * 160 + src_x;
-      let pixel = lcd_data[src_index];
-      let offset = y * row_size + x * 3;
-      bitmap_memory[offset + 0] = pixel; // B
-      bitmap_memory[offset + 1] = pixel; // R
-      bitmap_memory[offset + 2] = pixel; // G
+    Self {
+      scale,
+      hwnd,
+      bitmap,
+      bitmap_raw_ptr,
+      bitmap_length: image_size,
     }
   }
 }
 
-unsafe fn draw(hwnd: HWND, bitmap: HBITMAP, scale: usize) {
-  let hdc = GetDC(hwnd);
-  let dc_mem = CreateCompatibleDC(hdc);
+impl VideoImpl for Video {
+  fn draw_lcd(&mut self, lcd_data: &[u8]) {
+    let scale = self.scale;
 
-  let old_bitmap = SelectObject(dc_mem, bitmap);
+    unsafe {
+      let bitmap_memory: &mut [u8] = std::slice::from_raw_parts_mut(self.bitmap_raw_ptr, self.bitmap_length);
+      // Copy LCD data to bitmap
+      let width = 160 * scale;
+      let row_size = ((width * 24 + 31) / 32) * 4;
 
-  BitBlt(hdc, 0, 0, 160 * scale as i32, 144 * scale as i32, dc_mem, 0, 0, SRCCOPY);
+      for x in 0..(160 * scale) {
+        for y in 0..(144 * scale) {
+          let src_x = x / scale;
+          let src_y = y / scale;
+          let src_index = src_y * 160 + src_x;
+          let pixel = lcd_data[src_index];
+          let offset = y * row_size + x * 3;
+          bitmap_memory[offset + 0] = pixel; // B
+          bitmap_memory[offset + 1] = pixel; // R
+          bitmap_memory[offset + 2] = pixel; // G
+        }
+      }
 
-  SelectObject(dc_mem, old_bitmap);
+      // draw bitmap to screen
+      let hdc = GetDC(self.hwnd);
+      let dc_mem = CreateCompatibleDC(hdc);
+      let old_bitmap = SelectObject(dc_mem, self.bitmap);
+      BitBlt(hdc, 0, 0, 160 * scale as i32, 144 * scale as i32, dc_mem, 0, 0, SRCCOPY);
+      SelectObject(dc_mem, old_bitmap);
+      ReleaseDC(self.hwnd, hdc);
+    }
+  }
 
-  ReleaseDC(hwnd, hdc);
+  fn increase_scale(&mut self) -> PhysicalSize<u32> {
+    if self.scale >= 8 {
+      return PhysicalSize::new(160 * self.scale as u32, 144 * self.scale as u32);
+    }
+    let new_scale = self.scale * 2;
+    //self.set_scale(new_scale);
+    PhysicalSize::new(160 * new_scale as u32, 144 * new_scale as u32)
+  }
+
+  fn decrease_scale(&mut self) -> PhysicalSize<u32> {
+    if self.scale <= 1 {
+      return PhysicalSize::new(160 * self.scale as u32, 144 * self.scale as u32);
+    }
+    let new_scale = self.scale / 2;
+    //self.set_scale(new_scale);
+    PhysicalSize::new(160 * new_scale as u32, 144 * new_scale as u32)
+  }
 }
