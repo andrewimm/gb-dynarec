@@ -523,24 +523,29 @@ mod tests {
     for _ in 0..0x2000 {
       vram_vec.push(0);
     }
+    let mut oam_vec = Vec::with_capacity(0xa0);
+    for _ in 0..0xa0 {
+      oam_vec.push(0);
+    }
     let mut vram = vram_vec.into_boxed_slice();
+    let mut oam = oam_vec.into_boxed_slice();
     let mut video = VideoState::new();
     // video state starts out in vblank
     assert_eq!(video.get_lcd_status() & 3, 1);
     assert_eq!(video.get_ly(), 144);
     for i in 1..10 {
-      video.run_clock_cycles(ClockCycles(456), &mut vram);
+      video.run_clock_cycles(ClockCycles(456), &mut vram, &oam);
       assert_eq!(video.get_ly(), 144 + i);
     }
-    video.run_clock_cycles(ClockCycles(456), &mut vram);
+    video.run_clock_cycles(ClockCycles(456), &mut vram, &oam);
     // should now be in mode 2 of the first line
     assert_eq!(video.get_lcd_status() & 3, 2);
     assert_eq!(video.get_ly(), 0);
-    video.run_clock_cycles(ClockCycles(80), &mut vram);
+    video.run_clock_cycles(ClockCycles(80), &mut vram, &oam);
     // now in mode 3
     assert_eq!(video.get_lcd_status() & 3, 3);
     assert_eq!(video.get_ly(), 0);
-    video.run_clock_cycles(ClockCycles(376), &mut vram);
+    video.run_clock_cycles(ClockCycles(376), &mut vram, &oam);
     // 376 cycles covers mode 3 and mode 0, skipping to the next line
     assert_eq!(video.get_lcd_status() & 3, 2);
     assert_eq!(video.get_ly(), 1);
@@ -552,7 +557,12 @@ mod tests {
     for _ in 0..0x2000 {
       vram_vec.push(0);
     }
+    let mut oam_vec = Vec::with_capacity(0xa0);
+    for _ in 0..0xa0 {
+      oam_vec.push(0);
+    }
     let mut vram = vram_vec.into_boxed_slice();
+    let mut oam = oam_vec.into_boxed_slice();
     {
       // make the first line of the bg a repeating pattern of the first 4 tiles
       for i in 0..32 {
@@ -581,9 +591,9 @@ mod tests {
     video.set_bgp(0b11100100);
     video.set_lcd_control(0x90); // enable LCD, tiles start at 0x8000
     // get to start of first line
-    video.run_clock_cycles(ClockCycles(456 * 10), &mut vram);
+    video.run_clock_cycles(ClockCycles(456 * 10), &mut vram, &oam);
     // draw first line
-    video.run_clock_cycles(ClockCycles(456), &mut vram);
+    video.run_clock_cycles(ClockCycles(456), &mut vram, &oam);
     for i in 0..8 {
       assert_eq!(video.get_writing_buffer()[i], 255); // white
     }
@@ -610,7 +620,7 @@ mod tests {
     }
 
     // draw second line
-    video.run_clock_cycles(ClockCycles(456), &mut vram);
+    video.run_clock_cycles(ClockCycles(456), &mut vram, &oam);
     for i in 0..8 {
       assert_eq!(video.get_writing_buffer()[160 + i], 0);
     }
