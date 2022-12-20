@@ -36,6 +36,23 @@ impl Header {
     }
   }
 
+  pub fn get_cart_type(&self) -> MBCType {
+    match self.cart_type {
+      0x00 => MBCType::None,
+      0x01 => MBCType::MBC1,
+      0x02 => MBCType::MBC1,
+      0x03 => MBCType::MBC1,
+
+      0x05 => MBCType::MBC2,
+
+      0x11 => MBCType::MBC3,
+
+      0x19 => MBCType::MBC5,
+
+      _ => MBCType::Unknown,
+    }
+  }
+
   pub fn get_cart_type_string(&self) -> String {
     let inner = match self.cart_type {
       0x00 => "No MBC",
@@ -93,6 +110,17 @@ impl Header {
     }
     check == self.header_checksum
   }
+
+  pub fn create_cart_state(&self) -> Box<dyn CartState> {
+    match self.cart_type {
+      0x00 => Box::new(NullCartState::new()),
+      0x01 | 0x02 | 0x03 => Box::new(MBC1CartState::new()),
+      
+      0x11 | 0x12 | 0x13 => Box::new(MBC3CartState::new()),
+
+      _ => panic!("Unsupported cart type"),
+    }
+  }
 }
 
 impl std::fmt::Debug for Header {
@@ -112,4 +140,104 @@ pub enum MBCType {
   MBC2,
   MBC3,
   MBC5,
+  Unknown,
+}
+
+pub trait CartState {
+  fn write_rom(&mut self, addr: u16, value: u8) {
+  }
+
+  fn get_rom_bank(&self) -> usize {
+    1
+  }
+
+  fn get_ram_bank(&self) -> usize {
+    0
+  }
+
+  fn get_ram_override(&self, addr: u16) -> Option<u8> {
+    None
+  }
+}
+
+pub struct NullCartState {
+}
+
+impl NullCartState {
+  pub fn new() -> Self {
+    Self {}
+  }
+}
+
+impl CartState for NullCartState {}
+
+pub struct MBC1CartState {
+  rom_bank: usize,
+  ram_bank: usize,
+  ram_enabled: bool,
+  select_ram: bool,
+}
+
+impl MBC1CartState {
+  fn new() -> Self {
+    MBC1CartState {
+      rom_bank: 1,
+      ram_bank: 0,
+      ram_enabled: false,
+      select_ram: false,
+    }
+  }
+}
+
+impl CartState for MBC1CartState {
+  fn write_rom(&mut self, addr: u16, value: u8) {
+    if addr < 0x2000 {
+      let enable = (value & 0x0a) == 0x0a;
+      self.ram_enabled = enable;
+    } else if addr < 0x4000 {
+      // set the low 5 bits of the ROM bank
+      let bank_low = (value & 0x1f) as usize;
+      let rom_bank = self.rom_bank & !0x1f;
+      self.rom_bank = rom_bank | bank_low;
+    } else if addr < 0x6000 {
+      if self.select_ram {
+        self.ram_bank = (value & 0x03) as usize;
+      } else {
+        let bank_high = ((value & 0x03) << 5) as usize;
+        let rom_bank = self.rom_bank & 0x1f;
+        self.rom_bank = rom_bank | bank_high;
+      }
+    } else {
+      self.select_ram = (value & 1) == 1;
+    }
+  }
+
+  fn get_rom_bank(&self) -> usize {
+    self.rom_bank
+  }
+
+  fn get_ram_bank(&self) -> usize {
+    self.ram_bank
+  }
+
+  fn get_ram_override(&self, addr: u16) -> Option<u8> {
+    if self.ram_enabled {
+      None
+    } else {
+      Some(0xff)
+    }
+  }
+}
+
+pub struct MBC3CartState {
+}
+
+impl MBC3CartState {
+  pub fn new() -> Self {
+    Self {
+    }
+  }
+}
+
+impl CartState for MBC3CartState {
 }

@@ -1,19 +1,18 @@
-use crate::cart::Header;
+use crate::cart::{CartState, Header, NullCartState};
 use crate::devices::io::IO;
 use crate::timing::ClockCycles;
 use std::fs::File;
 
 pub struct MemoryAreas {
   pub rom: Box<[u8]>,
+  pub cart_state: Box<dyn CartState>,
   pub video_ram: Box<[u8]>,
   pub cart_ram: Box<[u8]>,
   pub work_ram: Box<[u8]>,
   pub oam_ram: Box<[u8]>,
   pub high_ram: Box<[u8]>,
 
-  pub rom_bank: usize,
   pub vram_bank: usize,
-  pub cram_bank: usize,
   pub wram_bank: usize,
 
   pub io: IO,
@@ -55,15 +54,14 @@ impl MemoryAreas {
 
     Self {
       rom: rom.into_boxed_slice(),
+      cart_state: Box::new(NullCartState::new()),
       video_ram: video_ram.into_boxed_slice(),
       cart_ram: vec![].into_boxed_slice(),
       work_ram: work_ram.into_boxed_slice(),
       oam_ram: create_buffer(0xa0),
       high_ram: create_buffer(127),
 
-      rom_bank: 1,
       vram_bank: 0,
-      cram_bank: 0,
       wram_bank: 1,
 
       io: IO::new(),
@@ -75,6 +73,7 @@ impl MemoryAreas {
   }
 
   pub fn with_rom_file(rom_file: &mut File, header: &Header) -> Self {
+    let cart_state = header.create_cart_state();
     let rom_size = header.get_rom_size_bytes();
     let video_ram_size = 8 * 1024; // 8KB for DMB, 16KB for CGB
     let cart_ram_size = header.get_ram_size_bytes();
@@ -89,14 +88,13 @@ impl MemoryAreas {
 
     Self {
       rom,
+      cart_state,
       video_ram,
       cart_ram,
       work_ram,
       oam_ram,
       high_ram,
-      rom_bank: 1,
       vram_bank: 0,
-      cram_bank: 0,
       wram_bank: 1,
 
       io: IO::new(),
@@ -108,6 +106,10 @@ impl MemoryAreas {
 
   pub fn as_ptr(&self) -> *const Self {
     self as *const Self
+  }
+
+  pub fn get_rom_bank(&self) -> usize {
+    self.cart_state.get_rom_bank()
   }
 
   pub fn run_clock_cycles(&mut self, cycles: ClockCycles) {
@@ -165,7 +167,7 @@ pub fn get_executable_memory_slice<'s>(start: usize, mem_ptr: *const MemoryAreas
   match start {
     0x0000..=0x3fff => &mem.rom[start..0x4000],
     0x4000..=0x7fff => {
-      let bank_start = mem.rom_bank * 0x4000;
+      let bank_start = mem.cart_state.get_rom_bank() * 0x4000;
       let bank_end = bank_start + 0x4000;
       let offset = (start & 0x3fff) + bank_start;
       &mem.rom[offset..bank_end]
@@ -198,14 +200,15 @@ pub extern "sysv64" fn memory_read_byte(areas: *const MemoryAreas, addr: u16) ->
   }
   if addr < 0x8000 { // ROM Bank NN
     let offset = addr as usize & 0x3fff;
-    return memory_areas.rom[0x4000 * memory_areas.rom_bank + offset];
+    return memory_areas.rom[0x4000 * memory_areas.cart_state.get_rom_bank() + offset];
   }
   if addr < 0xa000 { // VRAM
     let offset = addr as usize & 0x1fff;
     return memory_areas.video_ram[offset];
   }
   if addr < 0xc000 { // Cart RAM
-    panic!("Cart RAM not supported yet: {:#X}", addr);
+    let offset = addr as usize & 0x1fff;
+    return memory_areas.cart_ram[0x2000 * memory_areas.cart_state.get_ram_bank() + offset];
   }
   if addr < 0xd000 { // Work RAM Bank 0
     let offset = addr as usize & 0xfff;
@@ -242,10 +245,8 @@ pub extern "sysv64" fn memory_read_byte(areas: *const MemoryAreas, addr: u16) ->
 #[inline(never)]
 pub extern "sysv64" fn memory_write_byte(areas: *mut MemoryAreas, addr: u16, value: u8) {
   let memory_areas: &mut MemoryAreas = unsafe { &mut *areas };
-  if addr < 0x4000 { // ROM Bank 0
-    return;
-  }
-  if addr < 0x8000 { // ROM Bank NN
+  if addr < 0x8000 { // ROM Banks
+    memory_areas.cart_state.write_rom(addr, value);
     return;
   }
   if addr < 0xa000 { // VRAM
@@ -254,7 +255,9 @@ pub extern "sysv64" fn memory_write_byte(areas: *mut MemoryAreas, addr: u16, val
     return;
   }
   if addr < 0xc000 { // Cart RAM
-    panic!("Cart RAM not supported yet: {:#X}", addr);
+    let offset = addr as usize & 0x1fff;
+    memory_areas.video_ram[0x2000 * memory_areas.cart_state.get_ram_bank() + offset] = value;
+    return;
   }
   if addr < 0xd000 { // Work RAM Bank 0
     let offset = addr as usize & 0xfff;

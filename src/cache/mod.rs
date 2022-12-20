@@ -79,7 +79,7 @@ impl CodeCache {
     match ip {
       0x0000..=0x3fff => &mem.rom[ip..0x4000],
       0x4000..=0x7fff => {
-        let bank_start = mem.rom_bank * 0x4000;
+        let bank_start = mem.get_rom_bank() * 0x4000;
         let bank_end = bank_start + 0x4000;
         let offset = (ip & 0x3fff) + bank_start;
         &mem.rom[offset..bank_end]
