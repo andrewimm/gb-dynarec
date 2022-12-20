@@ -195,29 +195,29 @@ impl CartState for MBC1CartState {
       let enable = (value & 0x0a) == 0x0a;
       self.ram_enabled = enable;
     } else if addr < 0x4000 {
-      // set the low 5 bits of the ROM bank
-      let bank_low = (value & 0x1f) as usize;
-      let rom_bank = self.rom_bank & !0x1f;
-      self.rom_bank = rom_bank | bank_low;
+      self.rom_bank = (value & 0x1f) as usize;
     } else if addr < 0x6000 {
-      if self.select_ram {
-        self.ram_bank = (value & 0x03) as usize;
-      } else {
-        let bank_high = ((value & 0x03) << 5) as usize;
-        let rom_bank = self.rom_bank & 0x1f;
-        self.rom_bank = rom_bank | bank_high;
-      }
+      self.ram_bank = (value & 0x03) as usize;
     } else {
       self.select_ram = (value & 1) == 1;
     }
   }
 
   fn get_rom_bank(&self) -> usize {
-    self.rom_bank
+    if self.select_ram {
+      self.rom_bank
+    } else {
+      let bank_high = self.ram_bank << 5;
+      self.rom_bank | bank_high
+    }
   }
 
   fn get_ram_bank(&self) -> usize {
-    self.ram_bank
+    if self.select_ram {
+      self.ram_bank
+    } else {
+      0
+    }
   }
 
   fn get_ram_override(&self, addr: u16) -> Option<u8> {

@@ -256,7 +256,7 @@ pub extern "sysv64" fn memory_write_byte(areas: *mut MemoryAreas, addr: u16, val
   }
   if addr < 0xc000 { // Cart RAM
     let offset = addr as usize & 0x1fff;
-    memory_areas.video_ram[0x2000 * memory_areas.cart_state.get_ram_bank() + offset] = value;
+    memory_areas.cart_ram[0x2000 * memory_areas.cart_state.get_ram_bank() + offset] = value;
     return;
   }
   if addr < 0xd000 { // Work RAM Bank 0
