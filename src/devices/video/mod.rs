@@ -37,6 +37,7 @@ pub struct VideoState {
   bg_palette_value: u8,
   object_palette_0: [u8; 4],
   object_palette_1: [u8; 4],
+  scroll_x: u8,
   scroll_y: u8,
 
   current_mode: u8,
@@ -86,6 +87,7 @@ impl VideoState {
       bg_palette_value: 0,
       object_palette_0: [0; 4],
       object_palette_1: [0; 4],
+      scroll_x: 0,
       scroll_y: 0,
 
       // start at the beginning of a vblank
@@ -165,11 +167,11 @@ impl VideoState {
   }
 
   pub fn set_scroll_x(&mut self, value: u8) {
-
+    self.scroll_x = value;
   }
 
   pub fn get_scroll_x(&self) -> u8 {
-    0
+    self.scroll_x
   }
 
   pub fn set_scroll_y(&mut self, value: u8) {
@@ -265,6 +267,10 @@ impl VideoState {
       self.object_line_cache[i] = 0;
     }
     self.current_obj_line_cache_pixel = 8;
+    
+    if !self.object_enabled {
+      return;
+    }
     let current_line = self.current_line as isize;
     let object_height = if self.object_double_height { 16 } else { 8 };
     // iterate over all objects in OAM (every 4 bytes)
@@ -305,9 +311,9 @@ impl VideoState {
       return;
     }
     let mut drawn_count = 0;
-    /// line_x sweeps across every pixel in the object line cache
-    /// The first 8 pixels won't be drawn to the screen, nor the pixels beyond
-    /// index 168.
+    // line_x sweeps across every pixel in the object line cache
+    // The first 8 pixels won't be drawn to the screen, nor the pixels beyond
+    // index 168.
     let mut line_x = 0;
     // At each pixel, seek through the objects on the current line until one is
     // found starting on the current pixel. If one is located, its pixels are
@@ -365,6 +371,7 @@ impl VideoState {
     let tile_row = relative_tile_line & 7;
     self.current_tile_cache = self.get_tile_row(vram, tile_index, tile_row);
     self.next_cached_tile_x += 1;
+    self.next_cached_tile_x %= 32;
   }
 
   fn check_current_line(&self) -> InterruptFlag {
@@ -449,7 +456,7 @@ impl VideoState {
             self.current_mode_dots -= 80;
             self.current_mode = 3;
 
-            self.next_cached_tile_x = 0;
+            self.next_cached_tile_x = (self.scroll_x >> 3) as usize % 32;
             self.cache_next_tile_row(vram);
           }
         },
@@ -466,6 +473,7 @@ impl VideoState {
 
             // TODO: Account for scroll-x
             let mut tile_x: usize = previous_dot_count & 7;
+            //tile_x += self.scroll_x as usize & 7;
             let mut dots_remaining: usize = 4;
             let mut current_write_index: usize = previous_dot_count;
 
