@@ -240,11 +240,22 @@ impl VideoState {
     tile::interleave(low, high)
   }
 
-  pub fn get_object_row(&self, video_ram: &Box<[u8]>, tile_index: usize, row: usize) -> u16 {
+  pub fn get_object_row(&self, video_ram: &Box<[u8]>, tile_index: usize, row: usize, flip_x: bool) -> u16 {
     let mut address = tile_index << 4;
     address += row * 2;
-    let low = video_ram[address];
-    let high = video_ram[address + 1];
+    let low_raw = video_ram[address];
+    let high_raw = video_ram[address + 1];
+
+    let low = if flip_x {
+      (((low_raw as u64 * 0x80200802) & 0x0884422110).wrapping_mul(0x0101010101) >> 32) as u8
+    } else {
+      low_raw
+    };
+    let high = if flip_x {
+      (((high_raw as u64 * 0x80200802) & 0x0884422110).wrapping_mul(0x0101010101) >> 32) as u8
+    } else {
+      high_raw
+    };
     tile::interleave(low, high)
   }
 
@@ -265,12 +276,17 @@ impl VideoState {
       let tile_index = oam[offset + 2] as usize;
       let attributes = oam[offset + 3];
       offset += 4;
-      let object_line = current_line + 16 - object_y;
+      let mut object_line = current_line + 16 - object_y;
       if object_line < 0 || object_line >= object_height {
         continue;
       }
+      let flip_y = attributes & 0x40 != 0;
+      let flip_x = attributes & 0x20 != 0;
+      if flip_y {
+        object_line = object_height - object_line - 1;
+      }
 
-      let row_data = self.get_object_row(video_ram, tile_index, object_line as usize);
+      let row_data = self.get_object_row(video_ram, tile_index, object_line as usize, flip_x);
 
       objects_found.push(
         Some(
