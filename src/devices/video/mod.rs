@@ -458,6 +458,9 @@ impl VideoState {
 
             self.next_cached_tile_x = (self.scroll_x >> 3) as usize % 32;
             self.cache_next_tile_row(vram);
+            let fine_scroll_x = self.scroll_x as usize & 7;
+            let shift = fine_scroll_x * 2;
+            self.current_tile_cache <<= shift;
           }
         },
         3 => {
@@ -470,10 +473,11 @@ impl VideoState {
             self.current_mode = 0;
             interrupt_state |= self.check_mode_interrupt();
           } else if self.current_mode_dots < 160 && self.current_line < 144 {
-
-            // TODO: Account for scroll-x
             let mut tile_x: usize = previous_dot_count & 7;
-            //tile_x += self.scroll_x as usize & 7;
+            let fine_scroll_x = self.scroll_x as usize & 7;
+            tile_x += fine_scroll_x;
+            tile_x &= 7;
+
             let mut dots_remaining: usize = 4;
             let mut current_write_index: usize = previous_dot_count;
 
@@ -512,8 +516,9 @@ impl VideoState {
               if dots_remaining > 0 {
                 // load the next tile to cache
                 self.cache_next_tile_row(vram);
+                tile_x = 0;
               } else {
-                if tile_x == 8 {
+                if tile_x >= 8 {
                   self.cache_next_tile_row(vram);
                 }
                 break;
