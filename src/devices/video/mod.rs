@@ -23,6 +23,10 @@ pub struct VideoState {
   first_tile_offset: usize,
   bg_map_offset: usize,
   window_map_offset: usize,
+  object_double_height: bool,
+  object_enabled: bool,
+  window_enabled: bool,
+  bg_window_enabled: bool,
   lcd_control_value: u8,
   ly_compare: u8,
   interrupt_on_lyc: bool,
@@ -68,6 +72,10 @@ impl VideoState {
       first_tile_offset: 0,
       bg_map_offset: 0x1800,
       window_map_offset: 0x1800,
+      object_double_height: false,
+      object_enabled: false,
+      window_enabled: false,
+      bg_window_enabled: false,
       lcd_control_value: 0,
       ly_compare: 0,
       interrupt_on_lyc: false,
@@ -97,7 +105,12 @@ impl VideoState {
 
   pub fn set_lcd_control(&mut self, value: u8) {
     self.lcd.set_enabled(value & 0x80 != 0);
-
+    self.window_map_offset = if value & 0x40 == 0 {
+      0x1800
+    } else {
+      0x1c00
+    };
+    self.window_enabled = value & 0x20 == 0x20;
     let (tile_address_offset, first_tile_offset) = if value & 0x10 == 0 {
       (0x800, 0x800)
     } else {
@@ -110,11 +123,10 @@ impl VideoState {
     } else {
       0x1c00
     };
-    self.window_map_offset = if value & 0x40 == 0 {
-      0x1800
-    } else {
-      0x1c00
-    };
+    self.object_double_height = value & 0x04 == 0x04;
+    self.object_enabled = value & 0x02 == 0x02;
+    self.bg_window_enabled = value & 0x01 == 0x01;
+
     self.lcd_control_value = value;
   }
 
@@ -243,6 +255,7 @@ impl VideoState {
     }
     self.current_obj_line_cache_pixel = 8;
     let current_line = self.current_line as isize;
+    let object_height = if self.object_double_height { 16 } else { 8 };
     // iterate over all objects in OAM (every 4 bytes)
     let mut objects_found: Vec<Option<ObjectAttributes>> = Vec::with_capacity(10);
     let mut offset = 0;
@@ -253,7 +266,7 @@ impl VideoState {
       let attributes = oam[offset + 3];
       offset += 4;
       let object_line = current_line + 16 - object_y;
-      if object_line < 0 || object_line >= 8 {
+      if object_line < 0 || object_line >= object_height {
         continue;
       }
 
