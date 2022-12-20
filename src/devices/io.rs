@@ -86,6 +86,9 @@ impl IO {
 
       0x47 => self.video.get_bgp(),
 
+      0x48 => self.video.get_obj_palette(0),
+      0x49 => self.video.get_obj_palette(1),
+
       _ => 0xff,
     }
   }

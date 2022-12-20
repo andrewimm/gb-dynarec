@@ -35,8 +35,8 @@ pub struct VideoState {
   interrupt_on_mode_0: bool,
   bg_palette: [u8; 4],
   bg_palette_value: u8,
-  object_palette_0: [u8; 4],
-  object_palette_1: [u8; 4],
+  object_palettes: [u8; 4 * 8],
+  object_palette_values: [u8; 8],
   scroll_x: u8,
   scroll_y: u8,
 
@@ -85,8 +85,8 @@ impl VideoState {
       interrupt_on_mode_0: false,
       bg_palette: [0; 4],
       bg_palette_value: 0,
-      object_palette_0: [0; 4],
-      object_palette_1: [0; 4],
+      object_palettes: [0; 4 * 8],
+      object_palette_values: [0; 8],
       scroll_x: 0,
       scroll_y: 0,
 
@@ -211,16 +211,17 @@ impl VideoState {
     self.bg_palette_value
   }
 
-  pub fn set_obj_palette(&mut self, palette: u8, value: u8) {
-    let palette = if palette == 0 {
-      &mut self.object_palette_0
-    } else {
-      &mut self.object_palette_1
-    };
-    palette[0] = SHADES[(value & 3) as usize];
-    palette[1] = SHADES[((value >> 2) & 3) as usize];
-    palette[2] = SHADES[((value >> 4) & 3) as usize];
-    palette[3] = SHADES[((value >> 6) & 3) as usize];
+  pub fn set_obj_palette(&mut self, palette: usize, value: u8) {
+    let offset = (palette & 7) * 4;
+    self.object_palettes[offset + 0] = SHADES[(value & 3) as usize];
+    self.object_palettes[offset + 1] = SHADES[((value >> 2) & 3) as usize];
+    self.object_palettes[offset + 2] = SHADES[((value >> 4) & 3) as usize];
+    self.object_palettes[offset + 3] = SHADES[((value >> 6) & 3) as usize];
+    self.object_palette_values[palette & 7] = value;
+  }
+
+  pub fn get_obj_palette(&self, palette: usize) -> u8 {
+    self.object_palette_values[palette & 7]
   }
 
   pub fn get_tile_address(&self, index: usize) -> usize {
@@ -338,14 +339,16 @@ impl VideoState {
                 let priority = if obj.has_priority { 0x40 } else { 0 };
                 let palette = obj.palette << 2;
                 let color_index = ((pixel_data >> 14) & 3) as u8;
-                pixel_data <<= 2;
-                self.object_line_cache[offset] = (
-                  0x80 | // present
-                  priority |
-                  palette |
-                  color_index
-                );
+                if color_index != 0 {
+                  self.object_line_cache[offset] = (
+                    0x80 | // present
+                    priority |
+                    palette |
+                    color_index
+                  );
+                }
               }
+              pixel_data <<= 2;
             }
             drawn_count += 1;
             true
@@ -355,7 +358,9 @@ impl VideoState {
         };
         if drawn {
           // remove the object from the set
-          let _ = objects_found.get_mut(obj_index).take();
+          if let Some(inner) = objects_found.get_mut(obj_index) {
+            let _ = inner.take();
+          }
         }
       }
 
@@ -497,12 +502,9 @@ impl VideoState {
                 // TODO: sort out sprite priority with bg
                 if object_pixel & 0x80 != 0 && object_pixel & 3 != 0 {
                   // sprite is present
-                  let palette = if object_pixel & 0x40 == 0 {
-                    self.object_palette_0
-                  } else {
-                    self.object_palette_1
-                  };
-                  let obj_color = palette[(object_pixel & 3) as usize];
+                  let palette_index = (object_pixel & 0x1c) >> 2;
+                  let pal_offset = palette_index as usize * 4;
+                  let obj_color = self.object_palettes[pal_offset + ((object_pixel & 3) as usize)];
                   current_line_buffer[current_write_index] = obj_color;
                 } else {
                   current_line_buffer[current_write_index] = bg_color;
