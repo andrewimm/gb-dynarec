@@ -208,7 +208,12 @@ impl CartState for MBC1CartState {
       self.rom_bank
     } else {
       let bank_high = self.ram_bank << 5;
-      self.rom_bank | bank_high
+      let mut bank = self.rom_bank;
+      if bank == 0 {
+        bank = 1;
+      }
+      bank |= bank_high;
+      bank
     }
   }
 
@@ -230,14 +235,47 @@ impl CartState for MBC1CartState {
 }
 
 pub struct MBC3CartState {
+  rom_bank: usize,
+  ram_bank: usize,
+  ram_enabled: bool,
 }
 
 impl MBC3CartState {
   pub fn new() -> Self {
     Self {
+      rom_bank: 1,
+      ram_bank: 0,
+      ram_enabled: false,
     }
   }
 }
 
 impl CartState for MBC3CartState {
+  fn write_rom(&mut self, addr: u16, value: u8) {
+    if addr < 0x2000 {
+      self.ram_enabled = value & 0x0a == 0x0a;
+    } else if addr < 0x4000 {
+      self.rom_bank = value as usize & 0x7f;
+    } else if addr < 0x6000 {
+      if value < 0x04 {
+        self.ram_bank = value as usize;
+      } else {
+        // set clock register
+      }
+    } else {
+      // latch clock data
+    }
+  }
+
+  fn get_rom_bank(&self) -> usize {
+    let mut bank = self.rom_bank;
+    if bank == 0 {
+      bank = 1;
+    }
+    bank
+  }
+
+  fn get_ram_bank(&self) -> usize {
+    self.ram_bank
+  }
 }
