@@ -59,6 +59,8 @@ impl IO {
       0x47 => self.video.set_bgp(value),
       0x48 => self.video.set_obj_palette(0, value),
       0x49 => self.video.set_obj_palette(1, value),
+      0x4a => self.video.set_window_y(value),
+      0x4b => self.video.set_window_x(value),
 
       _ => (),
     }
@@ -88,6 +90,8 @@ impl IO {
 
       0x48 => self.video.get_obj_palette(0),
       0x49 => self.video.get_obj_palette(1),
+      0x4a => self.video.get_window_y(),
+      0x4b => self.video.get_window_x(),
 
       _ => 0xff,
     }

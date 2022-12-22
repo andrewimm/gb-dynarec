@@ -39,13 +39,14 @@ pub struct VideoState {
   object_palette_values: [u8; 8],
   scroll_x: u8,
   scroll_y: u8,
+  window_x: u8,
+  window_y: u8,
 
   current_mode: u8,
   current_mode_dots: usize,
   current_line: u8,
   next_cached_tile_x: usize,
   current_tile_cache: u16,
-
   /// At the beginning of each line, the objects for that line are pre-cached.
   /// The pixels are drawn into this buffer, where each byte represents a
   /// single object pixel in the following 8-bit format:
@@ -63,6 +64,7 @@ pub struct VideoState {
   /// additional 8 pixels are added before and after the visible buffer.
   object_line_cache: [u8; 176],
   current_obj_line_cache_pixel: usize,
+  current_window_line: Option<usize>,
 }
 
 impl VideoState {
@@ -89,6 +91,8 @@ impl VideoState {
       object_palette_values: [0; 8],
       scroll_x: 0,
       scroll_y: 0,
+      window_x: 0,
+      window_y: 0,
 
       // start at the beginning of a vblank
       current_mode: 1,
@@ -98,6 +102,7 @@ impl VideoState {
       current_tile_cache: 0,
       object_line_cache: [0; 176],
       current_obj_line_cache_pixel: 0,
+      current_window_line: None,
     }
   }
 
@@ -186,6 +191,22 @@ impl VideoState {
     self.current_line
   }
 
+  pub fn set_window_x(&mut self, value: u8) {
+    self.window_x = value;
+  }
+
+  pub fn get_window_x(&self) -> u8 {
+    self.window_x
+  }
+
+  pub fn set_window_y(&mut self, value: u8) {
+    self.window_y = value;
+  }
+
+  pub fn get_window_y(&self) -> u8 {
+    self.window_y
+  }
+
   pub fn set_ly_compare(&mut self, value: u8) -> InterruptFlag {
     self.ly_compare = value;
     self.check_current_line()
@@ -232,6 +253,12 @@ impl VideoState {
   fn get_bg_tile(&self, x: usize, y: usize, vram: &Box<[u8]>) -> u8 {
     let offset = x + y * 32;
     let address = self.bg_map_offset + offset;
+    vram[address]
+  }
+
+  fn get_window_tile(&self, x: usize, y: usize, vram: &Box<[u8]>) -> u8 {
+    let offset = x + y * 32;
+    let address = self.window_map_offset + offset;
     vram[address]
   }
 
@@ -379,6 +406,17 @@ impl VideoState {
     self.next_cached_tile_x %= 32;
   }
 
+  fn cache_next_window_tile_row(&mut self, vram: &Box<[u8]>) {
+    let tile_x = self.next_cached_tile_x;
+    let relative_tile_line = self.current_line.wrapping_sub(self.window_y) as usize;
+    let tile_y = relative_tile_line >> 3;
+    let tile_index = self.get_window_tile(tile_x, tile_y, vram) as usize;
+    let tile_row = relative_tile_line & 7;
+    self.current_tile_cache = self.get_tile_row(vram, tile_index, tile_row);
+    self.next_cached_tile_x += 1;
+    self.next_cached_tile_x %= 32;
+  }
+
   fn check_current_line(&self) -> InterruptFlag {
     if self.ly_compare == self.current_line {
       if self.interrupt_on_lyc {
@@ -461,11 +499,29 @@ impl VideoState {
             self.current_mode_dots -= 80;
             self.current_mode = 3;
 
-            self.next_cached_tile_x = (self.scroll_x >> 3) as usize % 32;
-            self.cache_next_tile_row(vram);
-            let fine_scroll_x = self.scroll_x as usize & 7;
-            let shift = fine_scroll_x * 2;
-            self.current_tile_cache <<= shift;
+            // For each screen line, determine if part of the window is visible
+            let mut use_window = false;
+            self.current_window_line = if !self.window_enabled || self.current_line < self.window_y {
+              None
+            } else {
+              use_window = true;
+              Some((self.current_line - self.window_y) as usize)
+            };
+            if use_window && self.window_x <= 7 {
+              // first tile drawn will be the window
+              let first_window_pixel = 7 - self.window_x;
+              self.next_cached_tile_x = 0;
+              self.cache_next_window_tile_row(vram);
+              let window_shift = first_window_pixel as usize * 2;
+              self.current_tile_cache <<= window_shift;
+            } else {
+              // first tile drawn will be the bg
+              self.next_cached_tile_x = (self.scroll_x >> 3) as usize % 32;
+              self.cache_next_tile_row(vram);
+              let fine_scroll_x = self.scroll_x as usize & 7;
+              let shift = fine_scroll_x * 2;
+              self.current_tile_cache <<= shift;
+            }
           }
         },
         3 => {
@@ -482,6 +538,20 @@ impl VideoState {
             let fine_scroll_x = self.scroll_x as usize & 7;
             tile_x += fine_scroll_x;
             tile_x &= 7;
+
+            let mut draw_window = false;
+            let window_x = self.window_x as usize;
+            if let Some(_y) = self.current_window_line {
+              draw_window = true;
+              if previous_dot_count + 7 >= window_x {
+                // draw the window instead of the bg
+                tile_x = (previous_dot_count + 7 - window_x) & 7;
+              }
+              // If this is the first pixel of the line, the tile will have
+              // already been cached during Mode 2.
+              // In other cases, it will have been cached once the draw loop
+              // increments the current pixel and does a window check.
+            }
 
             let mut dots_remaining: usize = 4;
             let mut current_write_index: usize = previous_dot_count;
@@ -514,15 +584,25 @@ impl VideoState {
                 tile_x += 1;
                 dots_remaining -= 1;
                 current_write_index += 1;
+
+                if draw_window && current_write_index + 7 == window_x {
+                  // the next pixel needs to be the start of the window
+                  self.next_cached_tile_x = 0;
+                  tile_x = 8;
+                }
               }
-              if dots_remaining > 0 {
-                // load the next tile to cache
-                self.cache_next_tile_row(vram);
-                tile_x = 0;
-              } else {
-                if tile_x >= 8 {
+              // At the end of the loop, either the tile has finished drawing
+              // or time has expired and the video processor needs to yield to
+              // other devices.
+              if tile_x >= 8 {
+                if draw_window && (current_write_index + 7 >= window_x) {
+                  self.cache_next_window_tile_row(vram);
+                } else {
                   self.cache_next_tile_row(vram);
                 }
+                tile_x = 0;
+              }
+              if dots_remaining == 0 {
                 break;
               }
             }
