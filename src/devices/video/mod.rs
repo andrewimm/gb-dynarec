@@ -533,7 +533,7 @@ impl VideoState {
             self.current_mode_dots -= 188;
             self.current_mode = 0;
             interrupt_state |= self.check_mode_interrupt();
-          } else if self.current_mode_dots < 160 && self.current_line < 144 {
+          } else if self.current_mode_dots <= 160 && self.current_line < 144 {
             let mut tile_x: usize = previous_dot_count & 7;
             let fine_scroll_x = self.scroll_x as usize & 7;
             tile_x += fine_scroll_x;

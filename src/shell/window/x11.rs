@@ -60,6 +60,19 @@ impl Video {
   }
 
   pub fn set_scale(&mut self, scale: usize) {
+    if self.scale != scale {
+      unsafe {
+        //(self.xlib.XClearWindow)(self.display, self.drawable);
+        (self.xlib.XFillRectangle)(
+          self.display,
+          self.drawable,
+          self.graphics_context,
+          0, 0,
+          160 * self.scale as u32,
+          144 * self.scale as u32,
+        );
+      }
+    }
     self.scale = scale;
     let new_buffer = buffer_for_scale(scale);
     let old_buffer = std::mem::replace(&mut self.video_buffer, new_buffer);
