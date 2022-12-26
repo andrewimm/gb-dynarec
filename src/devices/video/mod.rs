@@ -325,7 +325,7 @@ impl VideoState {
       objects_found.push(
         Some(
           ObjectAttributes {
-            has_priority: attributes & 0x80 != 0,
+            has_priority: attributes & 0x80 == 0,
             palette: (attributes & 0x10) >> 4,
             row_data,
             x_coord: object_x,
@@ -569,8 +569,8 @@ impl VideoState {
                 let palette_index = ((self.current_tile_cache & 0xc000) >> 14) as u8;
                 let bg_color = self.bg_palette[palette_index as usize];
 
-                // TODO: sort out sprite priority with bg
-                if object_pixel & 0x80 != 0 && object_pixel & 3 != 0 {
+                let obj_has_priority = (object_pixel & 0x40) != 0 || palette_index == 0;
+                if object_pixel & 0x80 != 0 && obj_has_priority {
                   // sprite is present
                   let palette_index = (object_pixel & 0x1c) >> 2;
                   let pal_offset = palette_index as usize * 4;
